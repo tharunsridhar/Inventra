@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inventra — Inventory Management</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">IV</div>
+      <h1>Inventra</h1>
+      <p>Inventory Management System</p>
+    </div>
+    <form id="login-form">
+      <label>Email
+        <input type="email" id="login-email" required autocomplete="username" placeholder="you@company.com" />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+      <p id="login-error" class="form-error hidden"></p>
+    </form>
+    <div class="login-hint">
+      <strong>Demo accounts</strong> (run <code>seed.py</code> first)
+      <ul>
+        <li><code>admin@inventra.com</code> / <code>admin123</code></li>
+        <li><code>manager@inventra.com</code> / <code>manager123</code></li>
+        <li><code>employee@inventra.com</code> / <code>employee123</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL ===================== -->
+<div id="app-shell" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">IV</div>
+      <span>Inventra</span>
+    </div>
+    <nav id="nav-list" class="nav-list">
+      <button class="nav-item" data-view="dashboard">📊 Dashboard</button>
+      <button class="nav-item" data-view="products">📦 Products</button>
+      <button class="nav-item" data-view="catalog">🏷️ Categories &amp; Suppliers</button>
+      <button class="nav-item" data-view="purchases">🛒 Purchase Orders</button>
+      <button class="nav-item" data-view="sales">💳 Sales Orders</button>
+      <button class="nav-item" data-view="returns" data-role="admin,manager">↩️ Returns</button>
+      <button class="nav-item" data-view="damage" data-role="admin,manager">⚠️ Damage Write-off</button>
+      <button class="nav-item" data-view="transactions">📜 Transactions</button>
+      <button class="nav-item" data-view="reports" data-role="admin,manager">📈 Reports</button>
+      <button class="nav-item" data-view="users" data-role="admin">👤 Users</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="notif-btn" class="nav-item notif-btn">🔔 Notifications <span id="notif-badge" class="badge hidden">0</span></button>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <h2 id="view-title">Dashboard</h2>
+      <div class="topbar-right">
+        <span id="user-chip" class="user-chip"></span>
+        <button id="logout-btn" class="btn btn-ghost">Log out</button>
+      </div>
+    </header>
+
+    <main id="content" class="content"></main>
+  </div>
+</div>
+
+<!-- ===================== NOTIFICATIONS DRAWER ===================== -->
+<div id="notif-drawer" class="drawer hidden">
+  <div class="drawer-header">
+    <h3>Notifications</h3>
+    <button id="notif-close" class="btn btn-ghost">✕</button>
+  </div>
+  <div id="notif-list" class="drawer-body"></div>
+</div>
+<div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
+
+<!-- ===================== MODAL ===================== -->
+<div id="modal-backdrop" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Title</h3>
+      <button id="modal-close" class="btn btn-ghost">✕</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- ===================== TOASTS ===================== -->
+<div id="toast-container" class="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
