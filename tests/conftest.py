@@ -27,9 +27,12 @@ from app.models import Role, User
 
 
 def _test_database_url() -> str:
+    # str(url) / repr(url) mask the password as "***" by default (SQLAlchemy's
+    # render_as_string(hide_password=True)) - fine for logging, but this string
+    # is actually used to open connections, so the real password must survive.
     url = make_url(settings.database_url)
     test_db_name = (url.database or "inventra") + "_test"
-    return str(url.set(database=test_db_name))
+    return url.set(database=test_db_name).render_as_string(hide_password=False)
 
 
 @pytest.fixture(scope="session")
