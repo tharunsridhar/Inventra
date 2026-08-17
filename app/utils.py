@@ -1,11 +1,9 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def now() -> datetime:
-    """Just datetime.utcnow() basically, but without the deprecation warning.
-    We keep everything naive/UTC because SQLite doesn't really store timezone
-    info anyway."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    """Timezone-aware UTC 'now', matching the DateTime(timezone=True) columns."""
+    return datetime.now(UTC)
 
 
 def notify(db, user_id, ntype, message, reference_id=None):

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inventra
+          POSTGRES_PASSWORD: inventra
+          POSTGRES_DB: inventra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inventra -d inventra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # conftest.py derives its own "inventra_test" DB from this at test
+      # time (create + migrate + drop, once per test session) - this value
+      # is also used directly by the standalone migration-chain check below.
+      DATABASE_URL: postgresql+psycopg://inventra:inventra@localhost:5432/inventra
+      JWT_SECRET: ci-test-secret-not-for-production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Alembic migrations
+        run: uv run alembic upgrade head
+
+      - name: Lint with ruff
+        run: uv run ruff check app tests alembic
+
+      - name: Run pytest
+        run: uv run pytest -v

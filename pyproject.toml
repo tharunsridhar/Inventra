@@ -1,12 +1,13 @@
 [project]
 name = "inventra"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",
     "bcrypt==4.0.1",
     "fastapi>=0.141.1",
     "passlib>=1.7.4",
+    "psycopg[binary]>=3.2",
     "pydantic-settings>=2.14.2",
     "pydantic[email]>=2.13.4",
     "python-dotenv>=1.2.2",
@@ -14,4 +15,28 @@ dependencies = [
     "python-multipart>=0.0.32",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.52.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "B008",  # FastAPI's Depends()/Query() in argument defaults is the idiomatic pattern, not a bug
+    "UP042", # (str, enum.Enum) -> enum.StrEnum is a style modernization out of scope for this pass
+    "UP046", # Generic[T] -> PEP 695 type params is a style modernization out of scope for this pass
 ]

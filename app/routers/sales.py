@@ -41,6 +41,17 @@ def get_so_or_404(db: Session, sales_order_id: uuid.UUID) -> SalesOrder:
     return so
 
 
+def get_so_for_update_or_404(db: Session, sales_order_id: uuid.UUID) -> SalesOrder:
+    # SELECT ... FOR UPDATE on the SO row itself, so two concurrent
+    # /complete calls on the same order can't both read status="created"
+    # before either commits. No joinedload here for the same reason as
+    # purchase orders - Postgres rejects FOR UPDATE with an outer join.
+    so = db.query(SalesOrder).filter(SalesOrder.id == sales_order_id).with_for_update().first()
+    if so is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sales order not found")
+    return so
+
+
 def get_active_product(db: Session, product_id: uuid.UUID) -> Product:
     product = db.query(Product).filter(Product.id == product_id).first()
     if product is None or not product.is_active:
@@ -80,7 +91,7 @@ def get_invoice(sales_order_id: uuid.UUID, db: Session = Depends(get_db), _user:
     so = get_so_or_404(db, sales_order_id)
     if so.status != SalesOrderStatus.COMPLETED or so.invoice_number is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice is not available until the sales order is completed")
-    total_amount = sum((item.quantity * item.unit_price for item in so.items))
+    total_amount = sum(item.quantity * item.unit_price for item in so.items)
     return InvoiceRead(
         sales_order_id=so.id,
         invoice_number=so.invoice_number,
@@ -135,16 +146,19 @@ def update_sales_order(sales_order_id: uuid.UUID, payload: SalesOrderUpdate, db:
 
 @router.post("/{sales_order_id}/complete", response_model=SalesOrderRead)
 def complete_sales_order(sales_order_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(can_sell)):
-    so = get_so_or_404(db, sales_order_id)
+    so = get_so_for_update_or_404(db, sales_order_id)
     if so.status == SalesOrderStatus.COMPLETED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sales order has already been completed")
 
     try:
         # check stock for every line item FIRST - if any one item can't be
-        # fulfilled, the whole sale is rejected, nothing gets deducted
+        # fulfilled, the whole sale is rejected, nothing gets deducted.
+        # Lock product rows in a fixed order (by id) - if two orders share
+        # products, every transaction that touches both always locks them in
+        # the same order, so they queue up instead of deadlocking each other.
         products_by_item = {}
-        for item in so.items:
-            product = db.query(Product).filter(Product.id == item.product_id).first()
+        for item in sorted(so.items, key=lambda i: i.product_id):
+            product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if product is None:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Product {item.product_id} no longer exists")
             if product.current_stock < item.quantity:

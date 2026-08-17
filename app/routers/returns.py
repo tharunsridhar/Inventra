@@ -30,6 +30,15 @@ def get_return_or_404(db: Session, return_id: uuid.UUID) -> Return:
     return ret
 
 
+def get_return_for_update_or_404(db: Session, return_id: uuid.UUID) -> Return:
+    # SELECT ... FOR UPDATE, so two concurrent /approve calls on the same
+    # return can't both read status="pending" before either commits.
+    ret = db.query(Return).filter(Return.id == return_id).with_for_update().first()
+    if ret is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return not found")
+    return ret
+
+
 @router.get("", response_model=Page[ReturnRead], dependencies=[Depends(manager_or_admin)])
 def list_returns(
     page: int = Query(1, ge=1),
@@ -58,7 +67,9 @@ def get_return(return_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.post("", response_model=ReturnRead, status_code=status.HTTP_201_CREATED)
 def create_return(payload: ReturnCreate, db: Session = Depends(get_db), current_user: User = Depends(manager_or_admin)):
-    so = db.query(SalesOrder).filter(SalesOrder.id == payload.sales_order_id).first()
+    # lock the sales order so two concurrent return requests against it can't
+    # both compute the same "remaining reservable quantity" and both pass
+    so = db.query(SalesOrder).filter(SalesOrder.id == payload.sales_order_id).with_for_update().first()
     if so is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sales order not found")
     if so.status != SalesOrderStatus.COMPLETED:
@@ -100,12 +111,12 @@ def create_return(payload: ReturnCreate, db: Session = Depends(get_db), current_
 
 @router.patch("/{return_id}/approve", response_model=ReturnRead)
 def approve_return(return_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(manager_or_admin)):
-    ret = get_return_or_404(db, return_id)
+    ret = get_return_for_update_or_404(db, return_id)
     if ret.status == ReturnStatus.APPROVED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Return has already been approved")
 
     try:
-        product = db.query(Product).filter(Product.id == ret.product_id).first()
+        product = db.query(Product).filter(Product.id == ret.product_id).with_for_update().first()
         if product is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product no longer exists")
 

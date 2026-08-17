@@ -1,31 +1,34 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.config import DATABASE_URL
+from app.config import settings
 
-# SQLite needs this for a multi-request app (only one thread touches a
-# connection at a time normally, FastAPI's dependency system works around that)
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# pool_size + max_overflow: up to 15 concurrent connections from one app
+# instance before requests start queuing - fine for a single-instance
+# deployment, revisit if you run multiple replicas against the same DB.
+# pool_timeout: fail fast (30s) instead of hanging forever when the pool
+# is exhausted.
+# pool_recycle: recycle connections every 30 min so we never hand out one
+# that a managed Postgres provider (Railway, RDS, etc.) has silently closed
+# for being idle too long.
+# pool_pre_ping: issue a cheap SELECT 1 before handing out a pooled
+# connection, so a dead connection surfaces as a quick reconnect instead of
+# a mid-request "server closed the connection unexpectedly".
+engine = create_engine(
+    settings.database_url,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    pool_timeout=settings.db_pool_timeout,
+    pool_recycle=settings.db_pool_recycle,
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
     pass
-
-
-# SQLite has foreign keys OFF by default, have to turn it on ourselves
-if DATABASE_URL.startswith("sqlite"):
-
-    @event.listens_for(Engine, "connect")
-    def _turn_on_foreign_keys(dbapi_connection, _connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
 
 
 def get_db() -> Generator[Session, None, None]:

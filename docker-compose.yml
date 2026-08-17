@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inventra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventra}
+      POSTGRES_DB: ${POSTGRES_DB:-inventra}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inventra} -d ${POSTGRES_DB:-inventra}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever DATABASE_URL is in .env (that one's for running
+      # the app directly on the host) - inside the compose network, Postgres
+      # is reachable by service name, not localhost.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-inventra}:${POSTGRES_PASSWORD:-inventra}@postgres:5432/${POSTGRES_DB:-inventra}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -37,6 +37,18 @@ def get_po_or_404(db: Session, purchase_order_id: uuid.UUID) -> PurchaseOrder:
     return po
 
 
+def get_po_for_update_or_404(db: Session, purchase_order_id: uuid.UUID) -> PurchaseOrder:
+    # SELECT ... FOR UPDATE on the PO row itself, so two concurrent /receive
+    # calls on the same PO can't both read status="ordered" before either
+    # commits. Postgres won't allow FOR UPDATE combined with the outer join
+    # that joinedload(items) produces, so this is a separate, plain query -
+    # `po.items` is loaded lazily afterwards instead.
+    po = db.query(PurchaseOrder).filter(PurchaseOrder.id == purchase_order_id).with_for_update().first()
+    if po is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase order not found")
+    return po
+
+
 @router.get("", response_model=Page[PurchaseOrderRead], dependencies=[Depends(manager_or_admin)])
 def list_purchase_orders(
     page: int = Query(1, ge=1),
@@ -117,7 +129,7 @@ def update_purchase_order(purchase_order_id: uuid.UUID, payload: PurchaseOrderUp
 
 @router.post("/{purchase_order_id}/receive", response_model=PurchaseOrderRead)
 def receive_purchase_order(purchase_order_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(manager_or_admin)):
-    po = get_po_or_404(db, purchase_order_id)
+    po = get_po_for_update_or_404(db, purchase_order_id)
     if po.status == PurchaseOrderStatus.RECEIVED:
         # already received - don't double-count the stock, just say no
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Purchase order has already been received")
@@ -125,8 +137,11 @@ def receive_purchase_order(purchase_order_id: uuid.UUID, db: Session = Depends(g
     # everything below happens as one transaction: if anything fails partway
     # through, we roll back so we never end up with half-applied stock changes
     try:
-        for item in po.items:
-            product = db.query(Product).filter(Product.id == item.product_id).first()
+        # lock product rows in a fixed order (by id) - if two orders share
+        # products, every transaction that touches both always locks them in
+        # the same order, so they queue up instead of deadlocking each other
+        for item in sorted(po.items, key=lambda i: i.product_id):
+            product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if product is None:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Product {item.product_id} no longer exists")
 

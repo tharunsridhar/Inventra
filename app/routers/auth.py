@@ -10,7 +10,7 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.config import REFRESH_TOKEN_EXPIRE_DAYS
+from app.config import settings
 from app.database import get_db
 from app.models import RefreshToken, Role, User
 from app.schemas import (
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def _issue_tokens(db: Session, user: User) -> TokenResponse:
     access_token = create_access_token(user.id, user.role.name)
     refresh_value = create_refresh_token_value()
-    expires_at = now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = now() + timedelta(days=settings.refresh_token_expire_days)
     db.add(RefreshToken(user_id=user.id, token=refresh_value, expires_at=expires_at))
     db.commit()
     return TokenResponse(access_token=access_token, refresh_token=refresh_value)
