@@ -9,7 +9,6 @@ Same inventory management domain as [Inventra (FastAPI)](https://github.com/thar
 - Role based JWT auth
 - Built as a second implementation of the same spec, so the two can be compared directly. See [FastAPI vs. Django](#fastapi-vs-django) below.
 
-🔗 **Live demo:** _not deployed yet, see [Deployment](#deployment) for the Railway steps_
 📘 **API docs:** DRF's browsable API at any endpoint (e.g. `/products`), `/admin` for the Django Admin
 
 ## Architecture
