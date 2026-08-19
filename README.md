@@ -1,8 +1,8 @@
 # Inventra (Django port)
 
-![CI](https://github.com/tharunsridhar/inventra-django/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/tharunsridhar/Inventra/actions/workflows/ci.yml/badge.svg)
 
-Same inventory-management domain as [Inventra](https://github.com/tharunsridhar/Inventra) — products,
+Same inventory-management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/fastapi) — products,
 suppliers, purchase orders, sales orders, returns, damage write-offs, and an append-only stock ledger,
 behind role-based JWT auth — rebuilt on Django 5 + Django REST Framework instead of FastAPI +
 SQLAlchemy. Built deliberately as a second implementation of the same spec, so the two can be compared
