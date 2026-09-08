@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
+    environment: &app-environment
       DJANGO_SETTINGS_MODULE: config.settings.production
       # Overrides whatever's in .env (that's for running directly on the
       # host) - inside the compose network, Postgres/Redis are reachable by
@@ -48,6 +48,36 @@ services:
       SECURE_SSL_REDIRECT: "false"
     ports:
       - "8000:8000"
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *app-environment
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *app-environment
+    command: celery -A config beat --loglevel=info
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,3 +87,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  media_data:

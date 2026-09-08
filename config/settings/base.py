@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -96,6 +97,14 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Generated invoice PDFs (Phase 4). Local disk only - fine for this spec's
+# scope, but a real multi-instance deployment would need this on shared/
+# object storage (S3 etc.) since gunicorn workers/replicas don't share a
+# filesystem. Not wired through whitenoise (that's STATIC_ROOT only, and is
+# a build-time compressed/hashed bundle, not a place to write at runtime).
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 # whitenoise serves collectstatic's output directly from gunicorn - no nginx
 # container needed, same "single deployable process" shape as the FastAPI
 # and PhotoShare ports. Compressed + hashed filenames, so a browser can
@@ -107,10 +116,10 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# db 0 = cache, db 1 = Celery broker, db 2 = Celery result backend (set up in
-# Phase 4) - kept on separate logical DBs so a FLUSHDB on the cache (Phase 2
-# invalidates via a version counter, never a real flush, but still) can't
-# also wipe out the task queue.
+# db 0 = cache, db 1 = Celery broker, db 2 = Celery result backend - kept on
+# separate logical DBs so a FLUSHDB on the cache (Phase 2 invalidates via a
+# version counter, never a real flush, but still) can't also wipe out the
+# task queue.
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 CACHES = {
@@ -119,6 +128,28 @@ CACHES = {
         "LOCATION": REDIS_URL,
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
     }
+}
+
+_REDIS_BASE = REDIS_URL.rsplit("/", 1)[0]
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", f"{_REDIS_BASE}/1")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", f"{_REDIS_BASE}/2")
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+# Redeliver a task if the worker dies mid-execution instead of losing it -
+# the cost is a task can run twice on a worker crash, which is why every
+# task below is itself idempotent (skips work it can prove already happened)
+# rather than relying on at-most-once delivery.
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BEAT_SCHEDULE = {
+    "sweep-low-stock": {
+        "task": "apps.inventory.tasks.sweep_low_stock",
+        "schedule": 15 * 60,
+    },
+    "reconcile-ledger-nightly": {
+        "task": "apps.inventory.tasks.reconcile_ledger",
+        "schedule": crontab(hour=2, minute=0),
+    },
 }
 
 REST_FRAMEWORK = {
