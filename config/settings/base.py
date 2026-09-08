@@ -107,6 +107,20 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# db 0 = cache, db 1 = Celery broker, db 2 = Celery result backend (set up in
+# Phase 4) - kept on separate logical DBs so a FLUSHDB on the cache (Phase 2
+# invalidates via a version counter, never a real flush, but still) can't
+# also wipe out the task queue.
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+    }
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
