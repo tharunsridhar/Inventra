@@ -1,5 +1,6 @@
 """Load test scenarios for Phase 6 of inventra-v2-spec.md.
 
+    uv run python manage.py generate_loadtest_tokens   # once, or whenever the pool needs resizing
     uv run locust -f loadtest/locustfile.py --host http://localhost:8000 StockMutator
     uv run locust -f loadtest/locustfile.py --host http://localhost:8000 ReportReader
     uv run locust -f loadtest/locustfile.py --host http://localhost:8000 MixedLoad
@@ -8,26 +9,40 @@ Run exactly one scenario at a time (Locust runs every User class in the
 file by default unless you name specific ones, as above) - see
 loadtest/README.md for the full run/seed/record procedure.
 
-Every user acquires its JWT once in on_start(), not per request - hammering
-/auth/login per request would throttle itself (the "auth" scope is 10/min)
-and measure login cost instead of the scenario being tested.
+Every simulated user picks a token from a pool pre-provisioned by
+generate_loadtest_tokens (loadtest/tokens.json) rather than logging in
+itself. Discovered by actually running this, not assumed up front:
+  - Hitting /auth/login from every simulated user, even once each, throttles
+    itself - unauthenticated requests are throttled by client IP, not by
+    which account, so every user on this one test machine shares one
+    10/min bucket regardless of how many distinct accounts they represent.
+  - Sharing ONE real account across many simulated users doesn't dodge that
+    - it just moves the collision to that account's own per-user "write"/
+    "stock_mutation" throttle buckets, throttling 40 "different" load-test
+    users as if they were one real user's traffic, which understates what
+    a real flash sale (many distinct customers, each with their own quota)
+    actually looks like.
+Distinct pre-provisioned users, each with their own independently-generated
+token, avoid both - no HTTP login calls at all, and each simulated user
+gets its own throttle bucket like a real distinct customer would.
 """
 
+import json
 import os
 import random
+from pathlib import Path
 
 from locust import HttpUser, between, task
 
 CONTENDED_SKU = os.environ.get("LOADTEST_CONTENDED_SKU", "LOADTEST-CONTENDED-001")
-EMPLOYEE_EMAIL = os.environ.get("LOADTEST_EMPLOYEE_EMAIL", "demo-employee-1@demo.seed")
-MANAGER_EMAIL = os.environ.get("LOADTEST_MANAGER_EMAIL", "demo-manager-1@demo.seed")
-PASSWORD = os.environ.get("LOADTEST_PASSWORD", "demopass123")
+TOKENS_PATH = Path(__file__).resolve().parent / "tokens.json"
 
-
-def _login(client, email, password):
-    res = client.post("/auth/login", json={"email": email, "password": password}, name="/auth/login")
-    res.raise_for_status()
-    return res.json()["access"]
+try:
+    _token_pool = json.loads(TOKENS_PATH.read_text())
+except FileNotFoundError:
+    raise RuntimeError(
+        f"{TOKENS_PATH} not found - run: uv run python manage.py generate_loadtest_tokens first"
+    ) from None
 
 
 class StockMutator(HttpUser):
@@ -40,16 +55,18 @@ class StockMutator(HttpUser):
 
     Locust itself can't assert "did we oversell" - that's a property of
     final DB state, not of any single response. Check it after the run
-    with apps.inventory.tasks-style stock/ledger inspection - see
-    loadtest/README.md."""
+    with a direct product/ledger query - see loadtest/README.md."""
 
     wait_time = between(0, 0.05)
 
     def on_start(self):
-        token = _login(self.client, EMPLOYEE_EMAIL, PASSWORD)
+        token = random.choice(_token_pool["employee"])
         self.client.headers.update({"Authorization": f"Bearer {token}"})
-        res = self.client.get(f"/products/?sku={CONTENDED_SKU}", name="/products (lookup contended)")
-        results = res.json().get("results", [])
+        # There's no exact-sku filter on this endpoint (see apps/catalog/
+        # filters.py) - `search` does a fuzzy match across name/sku/etc.,
+        # so filter to the exact sku client-side rather than trust ordering.
+        res = self.client.get(f"/products/?search={CONTENDED_SKU}", name="/products (lookup contended)")
+        results = [p for p in res.json().get("results", []) if p["sku"] == CONTENDED_SKU]
         if not results:
             raise RuntimeError(f"{CONTENDED_SKU} not found - run: manage.py reset_loadtest_stock first")
         self.product_id = results[0]["id"]
@@ -68,14 +85,13 @@ class StockMutator(HttpUser):
 
 class ReportReader(HttpUser):
     """Hammers /dashboard and /reports/inventory - measures Phase 2 cache
-    effectiveness under load (compare with the cache-response middleware
-    disabled/enabled, or just watch the X-Cache ratio in the Locust UI's
-    custom response headers if you enable that column)."""
+    effectiveness under load (compare with the caching decorator
+    disabled/enabled, or watch the X-Cache ratio via response headers)."""
 
     wait_time = between(0.1, 0.5)
 
     def on_start(self):
-        token = _login(self.client, MANAGER_EMAIL, PASSWORD)
+        token = random.choice(_token_pool["manager"])
         self.client.headers.update({"Authorization": f"Bearer {token}"})
 
     @task(2)
@@ -94,7 +110,7 @@ class MixedLoad(HttpUser):
     wait_time = between(0.1, 0.5)
 
     def on_start(self):
-        token = _login(self.client, MANAGER_EMAIL, PASSWORD)
+        token = random.choice(_token_pool["manager"])
         self.client.headers.update({"Authorization": f"Bearer {token}"})
         res = self.client.get("/products/", name="/products (list, seed pick)")
         self.product_ids = [p["id"] for p in res.json().get("results", [])]

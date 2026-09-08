@@ -16,3 +16,4 @@ wheels/
 staticfiles/
 media/
 loadtest/results/
+loadtest/tokens.json
