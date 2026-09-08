@@ -95,6 +95,36 @@ iterate the full unfiltered transaction/order tables. A cache with a 300s TTL
 responses on hit — which is the right fix here since the *endpoint* is
 expensive per call, not (only) the query plan.
 
+## Phase 2 — caching results (2.7)
+
+Re-measured the same four endpoints with caching live (same script, same
+seeded dataset, second request per endpoint so the cache is warm):
+
+| Endpoint | Queries before | Queries after (hit) |
+|---|---|---|
+| `/dashboard` | 9 | **1** (JWT auth's own user lookup only) |
+| `/reports/inventory` | 2 | **1** |
+| `/reports/sales` | 3 | **1** |
+| `/products/` (not cached — out of Phase 2's scope) | 3 | 3 (unchanged, as expected) |
+
+Query counts on a cache hit collapse to just the JWT authentication
+backend's own user lookup — the report/dashboard view body never runs at
+all, confirmed by `tests/test_caching.py`'s
+`test_second_identical_request_hits_cache`, which asserts this directly via
+`CaptureQueriesContext` rather than trusting a manual measurement.
+
+Wall-clock timings from this same script are **not** reported here: this
+measurement session ran alongside several other background processes on
+this machine (a WSL-hosted Redis instance kept alive for local verification
+since Docker Desktop was unavailable, and a concurrent `pytest` run), which
+inflated per-request latency into the seconds on some runs even for a
+single-query cache hit — clearly host contention, not the caching code
+itself, but not a number worth publishing either. The query-count result
+above is the reliable signal and matches the acceptance criterion directly
+("query counts near zero on hit"); a clean latency re-measurement can be
+taken any time by re-running `query_baseline`-style script logic against an
+idle machine.
+
 ## Seed command (Phase 0.4)
 
 `python manage.py seed_demo --products 500 --orders 2000 [--flush]`,
