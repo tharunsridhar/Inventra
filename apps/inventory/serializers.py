@@ -91,16 +91,6 @@ class SalesOrderWriteSerializer(serializers.Serializer):
         return value
 
 
-class InvoiceSerializer(serializers.Serializer):
-    sales_order_id = serializers.UUIDField()
-    invoice_number = serializers.CharField()
-    invoiced_at = serializers.DateTimeField()
-    customer_name = serializers.CharField(allow_null=True)
-    customer_phone = serializers.CharField(allow_null=True)
-    items = SalesOrderItemReadSerializer(many=True)
-    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
-
-
 class ReturnReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Return

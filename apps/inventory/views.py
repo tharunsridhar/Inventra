@@ -27,7 +27,6 @@ from apps.inventory.models import (
 from apps.inventory.serializers import (
     DamageWriteOffSerializer,
     InventoryTransactionReadSerializer,
-    InvoiceSerializer,
     PurchaseOrderReadSerializer,
     PurchaseOrderWriteSerializer,
     ReturnCreateSerializer,
@@ -35,6 +34,7 @@ from apps.inventory.serializers import (
     SalesOrderReadSerializer,
     SalesOrderWriteSerializer,
 )
+from apps.inventory.tasks import generate_invoice_pdf
 from apps.notifications.services import notify, notify_admins_and_managers
 
 
@@ -251,17 +251,20 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
 
     @action(detail=True, methods=["get"])
     def invoice(self, request, pk=None):
+        """Generates the invoice PDF asynchronously - was synchronous, now
+        returns 202 + a task id immediately and GET /tasks/{id}/ reports
+        progress and (once ready) a result_url for the PDF."""
         so = self.get_object()
         if so.status != SalesOrderStatus.COMPLETED or not so.invoice_number:
             return Response({"detail": "Invoice is not available until the sales order is completed"}, status=status.HTTP_404_NOT_FOUND)
-        items = list(so.items.all())
-        total_amount = sum((item.quantity * item.unit_price for item in items), start=0)
-        data = {
-            "sales_order_id": so.id, "invoice_number": so.invoice_number, "invoiced_at": so.invoiced_at,
-            "customer_name": so.customer_name, "customer_phone": so.customer_phone,
-            "items": items, "total_amount": total_amount,
-        }
-        return Response(InvoiceSerializer(data).data)
+
+        task_id = str(uuid.uuid4())
+        with transaction.atomic():
+            transaction.on_commit(lambda: generate_invoice_pdf.apply_async(args=[str(so.id)], task_id=task_id))
+        return Response(
+            {"task_id": task_id, "status_url": f"/tasks/{task_id}/"},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class ReturnViewSet(ScopedByActionThrottleMixin, viewsets.ModelViewSet):
