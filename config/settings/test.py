@@ -26,3 +26,21 @@ REST_FRAMEWORK = {
         "anon": "3/min",
     },
 }
+
+# Tasks run inline, synchronously, with no broker/worker/Redis needed for
+# tests at all. This is safe even for the "a rolled-back transaction must
+# not dispatch its task" guarantee: dispatch is always wrapped in
+# transaction.on_commit(...) in view code, and on_commit callbacks are
+# governed by whether the transaction actually commits regardless of
+# whether the task itself then runs eagerly or via a real broker.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+# Without this, an eager task's result exists only on the object .delay()
+# returns - a *separate* request (like GET /tasks/{id}/, looking the id up
+# fresh via AsyncResult) would find nothing, since eager mode skips the
+# result backend by default.
+CELERY_TASK_STORE_EAGER_RESULT = True
+# In-process, not real Redis - tests never need a broker at all (eager mode
+# never contacts it) and this keeps the result-backend side self-contained
+# too, instead of depending on Redis being reachable to run the suite.
+CELERY_RESULT_BACKEND = "cache+memory://"
