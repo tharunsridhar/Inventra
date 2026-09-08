@@ -1,8 +1,13 @@
 import os
 
+import structlog
+
 from .base import *  # noqa: F403
+from .base import core_logging_config
 
 DEBUG = False
+
+LOGGING = core_logging_config(structlog.processors.JSONRenderer())
 
 # Required in production - no "*" fallback like development.py has.
 ALLOWED_HOSTS = [h.strip() for h in os.environ["ALLOWED_HOSTS"].split(",") if h.strip()]

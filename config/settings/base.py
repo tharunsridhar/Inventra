@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+import structlog
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
@@ -42,6 +43,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # As early as possible - everything downstream (including the
+    # exception handler that logs 429s) should see request_id already
+    # bound in structlog's context.
+    "apps.core.middleware.RequestIDMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -166,6 +171,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "apps.core.exceptions.logging_exception_handler",
     # ScopedRateThrottle only engages on a view that sets throttle_scope (see
     # apps.core.throttling.ScopedByActionThrottleMixin) - everything else
     # falls through untouched. AnonRateThrottle is the general backstop for
@@ -198,3 +204,45 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
 }
+
+# Structured logging (Phase 5). This processor chain is shared by every
+# environment - it's what turns a logger.info(event, key=value, ...) call
+# into fields, not a formatted sentence. Which *renderer* turns that into
+# actual output text (JSON for production's log aggregator, colored
+# console output for development) is each environment's own choice - see
+# LOGGING in development.py / production.py, both built with
+# core_logging_config() below.
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+
+
+def core_logging_config(renderer):
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "structured": {
+                "()": structlog.stdlib.ProcessorFormatter,
+                "processors": [structlog.stdlib.ProcessorFormatter.remove_processors_meta, renderer],
+            },
+        },
+        "handlers": {
+            "console": {"class": "logging.StreamHandler", "formatter": "structured"},
+        },
+        "root": {"handlers": ["console"], "level": "INFO"},
+        "loggers": {
+            "django.server": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        },
+    }
