@@ -13,8 +13,11 @@ of a missed delete.
 import hashlib
 from functools import wraps
 
+import structlog
 from django.core.cache import cache
 from rest_framework.response import Response
+
+logger = structlog.get_logger(__name__)
 
 VERSION_KEY_TEMPLATE = "cache:version:{namespace}"
 DEFAULT_TTL = 300
@@ -63,9 +66,14 @@ def cached_response(namespace: str, ttl: int = DEFAULT_TTL):
     def decorator(view_method):
         @wraps(view_method)
         def wrapper(self, request, *args, **kwargs):
-            key = _cache_key(namespace, self.__class__.__name__, request)
+            endpoint = self.__class__.__name__
+            key = _cache_key(namespace, endpoint, request)
             cached = cache.get(key)
             if cached is not None:
+                # One log line per request, hit or miss - a log aggregator
+                # computes the hit/miss ratio per endpoint from these over
+                # time; nothing needs to be tallied in-process here.
+                logger.info("cache_lookup", endpoint=endpoint, outcome="hit")
                 response = Response(cached["data"], status=cached["status"])
                 response["X-Cache"] = "HIT"
                 return response
@@ -73,6 +81,7 @@ def cached_response(namespace: str, ttl: int = DEFAULT_TTL):
             response = view_method(self, request, *args, **kwargs)
             if 200 <= response.status_code < 300:
                 cache.set(key, {"data": response.data, "status": response.status_code}, timeout=ttl)
+            logger.info("cache_lookup", endpoint=endpoint, outcome="miss")
             response["X-Cache"] = "MISS"
             return response
 

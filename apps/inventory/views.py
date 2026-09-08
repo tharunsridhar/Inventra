@@ -1,6 +1,8 @@
+import time
 import uuid
 
 import django_filters
+import structlog
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -36,6 +38,8 @@ from apps.inventory.serializers import (
 )
 from apps.inventory.tasks import generate_invoice_pdf
 from apps.notifications.services import notify, notify_admins_and_managers
+
+logger = structlog.get_logger(__name__)
 
 
 def check_and_notify_stock(product):
@@ -117,8 +121,11 @@ class PurchaseOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, vi
             # either commits. Same lock Inventra takes with
             # db.query(PurchaseOrder)...with_for_update(), just spelled with
             # the ORM's select_for_update() instead of raw SQLAlchemy Core.
+            lock_wait_start = time.monotonic()
             po = PurchaseOrder.objects.select_for_update().get(pk=pk)
+            lock_wait_ms = (time.monotonic() - lock_wait_start) * 1000
             if po.status == PurchaseOrderStatus.RECEIVED:
+                logger.info("idempotent_replay_409", action="receive", order_id=str(po.id), actor_id=str(request.user.id), role=request.user.role)
                 return Response({"detail": "Purchase order has already been received"}, status=status.HTTP_409_CONFLICT)
 
             # lock product rows in a fixed order (by id) - if two orders
@@ -126,6 +133,7 @@ class PurchaseOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, vi
             # locks them in the same order, so they queue up instead of
             # deadlocking each other
             items = list(po.items.order_by("product_id"))
+            product_ids, quantity_delta = [], 0
             for item in items:
                 product = Product.objects.select_for_update().get(pk=item.product_id)
                 product.current_stock += item.quantity
@@ -135,6 +143,8 @@ class PurchaseOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, vi
                     reference_id=po.id, created_by=request.user,
                 )
                 check_and_notify_stock(product)
+                product_ids.append(str(product.id))
+                quantity_delta += item.quantity
 
             po.status = PurchaseOrderStatus.RECEIVED
             po.received_at = timezone.now()
@@ -142,6 +152,11 @@ class PurchaseOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, vi
             if po.created_by_id:
                 notify(po.created_by_id, "purchase_completed", f"Purchase order {po.id} has been received", po.id)
             transaction.on_commit(lambda: bump_version("inventory"))
+            logger.info(
+                "stock_mutation", action="receive", order_id=str(po.id), product_ids=product_ids,
+                quantity_delta=quantity_delta, actor_id=str(request.user.id), role=request.user.role,
+                lock_wait_ms=round(lock_wait_ms, 2),
+            )
 
         po.refresh_from_db()
         return Response(PurchaseOrderReadSerializer(po).data)
@@ -211,8 +226,11 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         with transaction.atomic():
+            lock_wait_start = time.monotonic()
             so = SalesOrder.objects.select_for_update().get(pk=pk)
+            lock_wait_ms = (time.monotonic() - lock_wait_start) * 1000
             if so.status == SalesOrderStatus.COMPLETED:
+                logger.info("idempotent_replay_409", action="complete", order_id=str(so.id), actor_id=str(request.user.id), role=request.user.role)
                 return Response({"detail": "Sales order has already been completed"}, status=status.HTTP_409_CONFLICT)
 
             items = list(so.items.order_by("product_id"))
@@ -228,6 +246,7 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
                     )
                 products_by_item[item.id] = product
 
+            product_ids, quantity_delta = [], 0
             for item in items:
                 product = products_by_item[item.id]
                 product.current_stock -= item.quantity
@@ -237,6 +256,8 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
                     reference_id=so.id, created_by=request.user,
                 )
                 check_and_notify_stock(product)
+                product_ids.append(str(product.id))
+                quantity_delta -= item.quantity
 
             so.status = SalesOrderStatus.COMPLETED
             so.invoice_number = f"INV-{uuid.uuid4().hex[:10].upper()}"
@@ -245,6 +266,11 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
             if so.created_by_id:
                 notify(so.created_by_id, "sale_completed", f"Sales order {so.id} has been completed", so.id)
             transaction.on_commit(lambda: bump_version("inventory"))
+            logger.info(
+                "stock_mutation", action="complete", order_id=str(so.id), product_ids=product_ids,
+                quantity_delta=quantity_delta, actor_id=str(request.user.id), role=request.user.role,
+                lock_wait_ms=round(lock_wait_ms, 2),
+            )
 
         so.refresh_from_db()
         return Response(SalesOrderReadSerializer(so).data)
@@ -259,8 +285,13 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
             return Response({"detail": "Invoice is not available until the sales order is completed"}, status=status.HTTP_404_NOT_FOUND)
 
         task_id = str(uuid.uuid4())
+        # Carries this request's id into the worker's own logs (see
+        # apps.core.celery_signals) so one id traces web -> queue -> worker.
+        headers = {"request_id": getattr(request, "request_id", None)}
         with transaction.atomic():
-            transaction.on_commit(lambda: generate_invoice_pdf.apply_async(args=[str(so.id)], task_id=task_id))
+            transaction.on_commit(
+                lambda: generate_invoice_pdf.apply_async(args=[str(so.id)], task_id=task_id, headers=headers)
+            )
         return Response(
             {"task_id": task_id, "status_url": f"/tasks/{task_id}/"},
             status=status.HTTP_202_ACCEPTED,
@@ -318,8 +349,11 @@ class ReturnViewSet(ScopedByActionThrottleMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"])
     def approve(self, request, pk=None):
         with transaction.atomic():
+            lock_wait_start = time.monotonic()
             ret = Return.objects.select_for_update().get(pk=pk)
+            lock_wait_ms = (time.monotonic() - lock_wait_start) * 1000
             if ret.status == ReturnStatus.APPROVED:
+                logger.info("idempotent_replay_409", action="approve", order_id=str(ret.id), actor_id=str(request.user.id), role=request.user.role)
                 return Response({"detail": "Return has already been approved"}, status=status.HTTP_409_CONFLICT)
 
             product = Product.objects.select_for_update().get(pk=ret.product_id)
@@ -333,6 +367,11 @@ class ReturnViewSet(ScopedByActionThrottleMixin, viewsets.ModelViewSet):
             ret.approved_by = request.user
             ret.save(update_fields=["status", "approved_by"])
             transaction.on_commit(lambda: bump_version("inventory"))
+            logger.info(
+                "stock_mutation", action="approve", order_id=str(ret.id), product_ids=[str(product.id)],
+                quantity_delta=ret.quantity, actor_id=str(request.user.id), role=request.user.role,
+                lock_wait_ms=round(lock_wait_ms, 2),
+            )
 
         ret.refresh_from_db()
         return Response(ReturnReadSerializer(ret).data)
@@ -350,7 +389,9 @@ class DamageWriteOffView(APIView):
         with transaction.atomic():
             # lock the product row so a concurrent write-off (or a sale
             # racing this write-off) can't both read the same current_stock
+            lock_wait_start = time.monotonic()
             product = Product.objects.select_for_update().filter(pk=data["product_id"], is_active=True).first()
+            lock_wait_ms = (time.monotonic() - lock_wait_start) * 1000
             if product is None:
                 return Response({"detail": "Product not found or inactive"}, status=status.HTTP_400_BAD_REQUEST)
             if product.current_stock < data["quantity"]:
@@ -366,6 +407,11 @@ class DamageWriteOffView(APIView):
             )
             check_and_notify_stock(product)
             transaction.on_commit(lambda: bump_version("inventory"))
+            logger.info(
+                "stock_mutation", action="damage", order_id=str(txn.id), product_ids=[str(product.id)],
+                quantity_delta=-data["quantity"], actor_id=str(request.user.id), role=request.user.role,
+                lock_wait_ms=round(lock_wait_ms, 2),
+            )
 
         return Response(InventoryTransactionReadSerializer(txn).data, status=status.HTTP_201_CREATED)
 
