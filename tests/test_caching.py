@@ -12,15 +12,6 @@ from tests.conftest import _make_user, auth_headers
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    from django.core.cache import cache
-
-    cache.clear()
-    yield
-    cache.clear()
-
-
 def test_second_identical_request_hits_cache(api_client, manager_user):
     with CaptureQueriesContext(connection) as first_queries:
         first = api_client.get("/reports/inventory", **auth_headers(manager_user))

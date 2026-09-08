@@ -14,11 +14,24 @@ live_db_session/live_client fixtures make.
 import uuid
 
 import pytest
+from django.core.cache import cache
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import RoleName, User
 from apps.catalog.models import Category, Product, Supplier
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    """LocMemCache (config.settings.test) is process-local and persists
+    across tests unless cleared - both the caching (Phase 2) and throttling
+    (Phase 3) suites store per-test-run state (cached responses, version
+    counters, throttle request counts) in it, so leaving it dirty between
+    tests would make one test's behavior depend on what ran before it."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture()
