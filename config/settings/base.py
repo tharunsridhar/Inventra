@@ -157,6 +157,14 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+# Phase 6 kill-switch, default True (the safe, correct path). Exists solely
+# to produce the locked-vs-unlocked comparison in docs/v2/LOAD_TEST_RESULTS.md
+# - apps/core/checks.py makes it impossible to actually deploy the unsafe
+# path (an Error if this is False while DEBUG is False).
+INVENTORY_LOCKING_ENABLED = os.environ.get("INVENTORY_LOCKING_ENABLED", "true").lower() == "true"
+
+import apps.core.checks  # noqa: E402,F401
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",

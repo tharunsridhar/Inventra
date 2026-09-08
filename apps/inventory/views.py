@@ -3,6 +3,7 @@ import uuid
 
 import django_filters
 import structlog
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -225,9 +226,17 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
+        # Phase 6 kill-switch (see apps.core.checks - impossible to deploy
+        # False outside DEBUG). Locking OFF still does a "check"
+        # (read-then-compare in Python) but not a real one - two concurrent
+        # requests can each read the same pre-deduction current_stock
+        # before either writes, which is exactly the oversell window this
+        # exists to demonstrate.
+        locking = settings.INVENTORY_LOCKING_ENABLED
         with transaction.atomic():
             lock_wait_start = time.monotonic()
-            so = SalesOrder.objects.select_for_update().get(pk=pk)
+            so_qs = SalesOrder.objects.select_for_update() if locking else SalesOrder.objects
+            so = so_qs.get(pk=pk)
             lock_wait_ms = (time.monotonic() - lock_wait_start) * 1000
             if so.status == SalesOrderStatus.COMPLETED:
                 logger.info("idempotent_replay_409", action="complete", order_id=str(so.id), actor_id=str(request.user.id), role=request.user.role)
@@ -235,10 +244,11 @@ class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, views
 
             items = list(so.items.order_by("product_id"))
             products_by_item = {}
+            product_qs = Product.objects.select_for_update() if locking else Product.objects
             # check stock for every line item FIRST - if any one item can't
             # be fulfilled, the whole sale is rejected, nothing gets deducted
             for item in items:
-                product = Product.objects.select_for_update().get(pk=item.product_id)
+                product = product_qs.get(pk=item.product_id)
                 if product.current_stock < item.quantity:
                     return Response(
                         {"detail": f"Insufficient stock for '{product.name}': available {product.current_stock}, requested {item.quantity}"},
