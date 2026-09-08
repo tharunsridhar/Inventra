@@ -5,13 +5,18 @@ from apps.accounts.permissions import IsManagerOrAdmin
 from apps.catalog.filters import ProductFilter
 from apps.catalog.models import Category, Product, Supplier
 from apps.catalog.serializers import CategorySerializer, ProductSerializer, SupplierSerializer
+from apps.core.throttling import ScopedByActionThrottleMixin
 
 
-class _ReadForAllWriteForManagers(viewsets.ModelViewSet):
+class _ReadForAllWriteForManagers(ScopedByActionThrottleMixin, viewsets.ModelViewSet):
     """Every authenticated role can read; only Manager/Admin can write -
     the same split Inventra's `manager_or_admin` dependency enforces per
     write route, expressed once here via get_permissions() instead of
     once per endpoint."""
+
+    action_throttle_scopes = {
+        "create": "write", "update": "write", "partial_update": "write", "destroy": "write",
+    }
 
     def get_permissions(self):
         if self.action in ("list", "retrieve"):

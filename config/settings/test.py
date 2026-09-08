@@ -11,3 +11,18 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
 }
+
+# Small numeric limits (same "/min" window as production) so a throttling
+# test can trip a 429 with a handful of requests instead of hundreds -
+# window duration doesn't matter for test speed, only the count does.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,  # noqa: F405
+    "DEFAULT_THROTTLE_RATES": {
+        "auth": "3/min",
+        "read": "5/min",
+        "write": "5/min",
+        "stock_mutation": "3/min",
+        "reports": "3/min",
+        "anon": "3/min",
+    },
+}

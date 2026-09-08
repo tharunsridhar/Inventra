@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsAnyRole, IsManagerOrAdmin
 from apps.catalog.models import Product
 from apps.core.cache import bump_version
+from apps.core.throttling import ScopedByActionThrottleMixin
 from apps.inventory.models import (
     InventoryTransaction,
     PurchaseOrder,
@@ -61,10 +62,14 @@ class DateRangeFilterMixin:
         return queryset
 
 
-class PurchaseOrderViewSet(DateRangeFilterMixin, viewsets.ModelViewSet):
+class PurchaseOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.select_related("supplier").prefetch_related("items")
     permission_classes = [IsManagerOrAdmin]
     filterset_fields = ["status"]
+    action_throttle_scopes = {
+        "create": "write", "update": "write", "partial_update": "write", "destroy": "write",
+        "receive": "stock_mutation",
+    }
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -142,10 +147,14 @@ class PurchaseOrderViewSet(DateRangeFilterMixin, viewsets.ModelViewSet):
         return Response(PurchaseOrderReadSerializer(po).data)
 
 
-class SalesOrderViewSet(DateRangeFilterMixin, viewsets.ModelViewSet):
+class SalesOrderViewSet(ScopedByActionThrottleMixin, DateRangeFilterMixin, viewsets.ModelViewSet):
     queryset = SalesOrder.objects.prefetch_related("items")
     permission_classes = [IsAnyRole]
     filterset_fields = ["status"]
+    action_throttle_scopes = {
+        "create": "write", "update": "write", "partial_update": "write", "destroy": "write",
+        "complete": "stock_mutation",
+    }
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -255,9 +264,13 @@ class SalesOrderViewSet(DateRangeFilterMixin, viewsets.ModelViewSet):
         return Response(InvoiceSerializer(data).data)
 
 
-class ReturnViewSet(viewsets.ModelViewSet):
+class ReturnViewSet(ScopedByActionThrottleMixin, viewsets.ModelViewSet):
     queryset = Return.objects.all()
     permission_classes = [IsManagerOrAdmin]
+    action_throttle_scopes = {
+        "create": "write", "update": "write", "partial_update": "write", "destroy": "write",
+        "approve": "stock_mutation",
+    }
 
     def get_serializer_class(self):
         return ReturnCreateSerializer if self.action == "create" else ReturnReadSerializer
@@ -324,6 +337,7 @@ class ReturnViewSet(viewsets.ModelViewSet):
 
 class DamageWriteOffView(APIView):
     permission_classes = [IsManagerOrAdmin]
+    throttle_scope = "stock_mutation"
 
     def post(self, request):
         serializer = DamageWriteOffSerializer(data=request.data)
@@ -372,6 +386,7 @@ class InventoryTransactionViewSet(DateRangeFilterMixin, viewsets.ReadOnlyModelVi
     serializer_class = InventoryTransactionReadSerializer
     permission_classes = [IsManagerOrAdmin]
     filterset_class = InventoryTransactionFilter
+    throttle_scope = "read"
 
     def get_queryset(self):
         return self.filter_date_range(super().get_queryset())

@@ -14,6 +14,7 @@ from apps.inventory.models import InventoryTransaction, PurchaseOrder, SalesOrde
 
 class DashboardView(APIView):
     permission_classes = [IsManagerOrAdmin]
+    throttle_scope = "reports"
 
     @cached_response("inventory")
     def get(self, request):
@@ -34,6 +35,7 @@ class DashboardView(APIView):
 
 class _DateRangeReportView(APIView):
     permission_classes = [IsManagerOrAdmin]
+    throttle_scope = "reports"
 
     def date_range(self, request):
         return request.query_params.get("start_date"), request.query_params.get("end_date")

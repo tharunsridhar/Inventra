@@ -13,6 +13,7 @@ from apps.accounts.serializers import (
     UserReadSerializer,
     UserUpdateSerializer,
 )
+from apps.core.throttling import ScopedByActionThrottleMixin
 
 
 class RegisterView(generics.CreateAPIView):
@@ -21,6 +22,7 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_scope = "auth"
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -32,12 +34,13 @@ class RegisterView(generics.CreateAPIView):
 class MeView(generics.RetrieveAPIView):
     serializer_class = UserReadSerializer
     permission_classes = [IsAuthenticated]
+    throttle_scope = "read"
 
     def get_object(self):
         return self.request.user
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(ScopedByActionThrottleMixin, viewsets.ModelViewSet):
     """Admin-only: list/retrieve/create/update, plus the same custom actions
     Inventra exposes (assign-role, reset-password, enable/disable) as extra
     routes via @action - DRF's answer to FastAPI's one-off
@@ -45,6 +48,10 @@ class UserViewSet(viewsets.ModelViewSet):
 
     queryset = User.objects.all()
     permission_classes = [IsAdmin]
+    action_throttle_scopes = {
+        "create": "write", "update": "write", "partial_update": "write", "destroy": "write",
+        "assign_role": "write", "reset_password": "write", "enable": "write",
+    }
 
     def get_serializer_class(self):
         if self.action == "create":

@@ -3,15 +3,17 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.core.throttling import ScopedByActionThrottleMixin
 from apps.notifications.models import Notification
 from apps.notifications.serializers import NotificationSerializer
 
 
-class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+class NotificationViewSet(ScopedByActionThrottleMixin, viewsets.ReadOnlyModelViewSet):
     """Per-user, filterable by unread - each user only ever sees their own."""
 
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    action_throttle_scopes = {"mark_read": "write"}
 
     def get_queryset(self):
         qs = Notification.objects.filter(user=self.request.user)

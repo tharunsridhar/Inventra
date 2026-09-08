@@ -135,6 +135,24 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # ScopedRateThrottle only engages on a view that sets throttle_scope (see
+    # apps.core.throttling.ScopedByActionThrottleMixin) - everything else
+    # falls through untouched. AnonRateThrottle is the general backstop for
+    # unauthenticated traffic on views that don't declare a scope of their
+    # own. Neither ever applies to /health - it's a plain Django view, not a
+    # DRF one, so it never enters this pipeline at all.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "auth": "10/min",
+        "read": "200/min",
+        "write": "60/min",
+        "stock_mutation": "20/min",
+        "reports": "30/min",
+        "anon": "20/min",
+    },
 }
 
 # ROTATE_REFRESH_TOKENS + BLACKLIST_AFTER_ROTATION + the token_blacklist app
