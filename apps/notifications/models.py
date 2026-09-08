@@ -9,6 +9,7 @@ class NotificationType(models.TextChoices):
     OUT_OF_STOCK = "out_of_stock", "Out of stock"
     PURCHASE_COMPLETED = "purchase_completed", "Purchase completed"
     SALE_COMPLETED = "sale_completed", "Sale completed"
+    RECONCILIATION_MISMATCH = "reconciliation_mismatch", "Ledger reconciliation mismatch"
 
 
 class Notification(models.Model):
