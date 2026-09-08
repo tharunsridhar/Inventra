@@ -24,6 +24,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       DJANGO_SETTINGS_MODULE: config.settings.development
@@ -33,6 +42,11 @@ jobs:
       # value is also used directly by the standalone migration-chain check
       # below.
       DATABASE_URL: postgresql://inventra:inventra@localhost:5432/inventra_django
+      # Only used by the "Run Django migrations" step below and by manage.py
+      # commands generally - pytest itself uses config.settings.test, which
+      # points cache/Celery at in-process backends (see config/settings/
+      # test.py) and never touches this Redis service at all.
+      REDIS_URL: redis://localhost:6379/0
 
     steps:
       - uses: actions/checkout@v4
