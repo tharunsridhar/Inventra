@@ -8,12 +8,14 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.accounts.permissions import IsManagerOrAdmin
 from apps.catalog.models import Category, Product, Supplier
+from apps.core.cache import cached_response
 from apps.inventory.models import InventoryTransaction, PurchaseOrder, SalesOrder, TransactionType
 
 
 class DashboardView(APIView):
     permission_classes = [IsManagerOrAdmin]
 
+    @cached_response("inventory")
     def get(self, request):
         active_products = Product.objects.filter(is_active=True)
         return Response({
@@ -38,6 +40,7 @@ class _DateRangeReportView(APIView):
 
 
 class ProductReportView(_DateRangeReportView):
+    @cached_response("inventory")
     def get(self, request):
         start, end = self.date_range(request)
         qs = Product.objects.all()
@@ -61,6 +64,7 @@ class ProductReportView(_DateRangeReportView):
 
 
 class PurchaseReportView(_DateRangeReportView):
+    @cached_response("inventory")
     def get(self, request):
         start, end = self.date_range(request)
         qs = PurchaseOrder.objects.prefetch_related("items")
@@ -83,6 +87,7 @@ class PurchaseReportView(_DateRangeReportView):
 
 
 class SalesReportView(_DateRangeReportView):
+    @cached_response("inventory")
     def get(self, request):
         start, end = self.date_range(request)
         qs = SalesOrder.objects.prefetch_related("items")
@@ -105,6 +110,7 @@ class SalesReportView(_DateRangeReportView):
 
 
 class InventoryReportView(_DateRangeReportView):
+    @cached_response("inventory")
     def get(self, request):
         start, end = self.date_range(request)
         qs = InventoryTransaction.objects.all()

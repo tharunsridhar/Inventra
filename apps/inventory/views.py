@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAnyRole, IsManagerOrAdmin
 from apps.catalog.models import Product
+from apps.core.cache import bump_version
 from apps.inventory.models import (
     InventoryTransaction,
     PurchaseOrder,
@@ -135,6 +136,7 @@ class PurchaseOrderViewSet(DateRangeFilterMixin, viewsets.ModelViewSet):
             po.save(update_fields=["status", "received_at"])
             if po.created_by_id:
                 notify(po.created_by_id, "purchase_completed", f"Purchase order {po.id} has been received", po.id)
+            transaction.on_commit(lambda: bump_version("inventory"))
 
         po.refresh_from_db()
         return Response(PurchaseOrderReadSerializer(po).data)
@@ -233,6 +235,7 @@ class SalesOrderViewSet(DateRangeFilterMixin, viewsets.ModelViewSet):
             so.save(update_fields=["status", "invoice_number", "invoiced_at"])
             if so.created_by_id:
                 notify(so.created_by_id, "sale_completed", f"Sales order {so.id} has been completed", so.id)
+            transaction.on_commit(lambda: bump_version("inventory"))
 
         so.refresh_from_db()
         return Response(SalesOrderReadSerializer(so).data)
@@ -313,6 +316,7 @@ class ReturnViewSet(viewsets.ModelViewSet):
             ret.status = ReturnStatus.APPROVED
             ret.approved_by = request.user
             ret.save(update_fields=["status", "approved_by"])
+            transaction.on_commit(lambda: bump_version("inventory"))
 
         ret.refresh_from_db()
         return Response(ReturnReadSerializer(ret).data)
@@ -344,6 +348,7 @@ class DamageWriteOffView(APIView):
                 created_by=request.user, reason=data["reason"],
             )
             check_and_notify_stock(product)
+            transaction.on_commit(lambda: bump_version("inventory"))
 
         return Response(InventoryTransactionReadSerializer(txn).data, status=status.HTTP_201_CREATED)
 
