@@ -159,7 +159,21 @@ class Command(BaseCommand):
 
         purchase_orders, purchase_items = [], []
         sales_orders, sales_items = [], []
-        transactions = []
+        # Product.current_stock was set directly in _seed_products() with no
+        # backing transaction - left as-is, that opening balance would be
+        # "magic" stock the ledger can never account for, and Phase 4's
+        # reconciliation task (current_stock == sum of its transactions)
+        # would flag every single seeded product as a mismatch on day one.
+        # A real system has no such thing as stock that didn't come from
+        # somewhere, so give each product's starting balance its own
+        # PURCHASE transaction instead of leaving it untraced.
+        transactions = [
+            InventoryTransaction(
+                id=uuid.uuid4(), product=p, quantity=p.current_stock, transaction_type=TransactionType.PURCHASE,
+                created_by=rng.choice(managers),
+            )
+            for p in products if p.current_stock > 0
+        ]
         completed_sales_orders = []  # (SalesOrder, [SalesOrderItem]) for eligible returns
 
         for n in range(num_orders):

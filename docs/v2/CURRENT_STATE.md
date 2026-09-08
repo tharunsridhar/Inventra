@@ -145,13 +145,21 @@ implemented at
   `/complete`, `/returns/{id}/approve` and `/damage` endpoints do — one
   `InventoryTransaction` per stock change, `Product.current_stock` kept in
   sync — so the seeded dataset satisfies the ledger invariant
-  (`current_stock == sum of its transactions`) that Phase 4's reconciliation
-  task will check.
-- Verified run (`--products 500 --orders 2000`, ~20s): 10 categories, 20
-  suppliers, 6 users, 500 products, 1003 purchase orders, 998 sales orders,
-  4015 inventory transactions, 39 returns. (Dev DB shows 501 products —
-  one pre-existing product from earlier manual testing predates this branch;
-  harmless, not part of the seeded/tagged set.)
+  (`current_stock == sum of its transactions`) Phase 4's reconciliation task
+  checks. **Correction (Phase 4):** the first version of this command set
+  each product's opening `current_stock` directly with no backing
+  transaction — an untraceable "magic" balance that would have made every
+  single seeded product show up as a reconciliation mismatch. Fixed by
+  giving each product's starting balance its own `PURCHASE` transaction;
+  re-verified by running `apps.inventory.tasks.reconcile_ledger` directly
+  against the re-seeded dev DB: `mismatched_count: 0` across all 501
+  products.
+- Verified run (`--products 500 --orders 2000 --flush`, ~20s): 10
+  categories, 20 suppliers, 6 users, 500 products, 1006 purchase orders, 995
+  sales orders, 4495 inventory transactions, 39 returns. (Dev DB shows 501
+  products — one pre-existing product from earlier manual testing predates
+  this branch; harmless, not part of the seeded/tagged set, and it happens
+  to reconcile cleanly too.)
 
 ## Environment note
 
