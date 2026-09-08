@@ -12,3 +12,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 app = Celery("inventra")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
+
+# Registers task_prerun/task_postrun/task_failure handlers that bind the
+# dispatching request's request_id into this worker's log context - see
+# apps/core/celery_signals.py.
+import apps.core.celery_signals  # noqa: E402,F401
