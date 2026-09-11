@@ -35,7 +35,6 @@ jobs:
           --health-retries 10
 
     env:
-      DJANGO_SETTINGS_MODULE: config.settings.development
       DJANGO_SECRET_KEY: ci-test-secret-not-for-production
       # pytest-django derives its own "test_inventra_django" DB from this at
       # test time (create + migrate + drop, once per test session) - this
@@ -61,7 +60,14 @@ jobs:
         run: uv sync --frozen
 
       - name: Run Django migrations
+        # DJANGO_SETTINGS_MODULE is set only for this step - if it were a
+        # job-level env var it would leak into the "Run pytest" step below
+        # and override pyproject.toml's DJANGO_SETTINGS_MODULE=config.settings.test,
+        # silently pointing tests at real (non-eager) Celery and production
+        # throttle rates instead of the test settings' in-process backends.
         run: uv run python manage.py migrate
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
 
       - name: Lint with ruff
         run: uv run ruff check apps config tests manage.py
