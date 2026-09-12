@@ -82,11 +82,11 @@ async function tryRefresh() {
     const res = await fetch(API_BASE + "/auth/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: state.refreshToken }),
+      body: JSON.stringify({ refresh: state.refreshToken }),
     });
     if (!res.ok) return false;
     const data = await res.json();
-    setTokens(data.access_token, data.refresh_token);
+    setTokens(data.access, data.refresh);
     return true;
   } catch (_) {
     return false;
@@ -195,7 +195,7 @@ function applyRoleVisibility() {
 
 async function login(email, password) {
   const data = await api("/auth/login", { method: "POST", body: { email, password }, auth: false });
-  setTokens(data.access_token, data.refresh_token);
+  setTokens(data.access, data.refresh);
   await loadCurrentUser();
 }
 
@@ -211,7 +211,7 @@ function logout() {
     fetch(API_BASE + "/auth/logout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refresh }),
+      body: JSON.stringify({ refresh: refresh }),
     }).catch(() => {});
   }
   document.getElementById("app-shell").classList.add("hidden");
