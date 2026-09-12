@@ -5,6 +5,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path
+from django.views.generic import TemplateView
 
 from apps.core.views import TaskStatusView
 from config.celery import app as celery_app
@@ -44,6 +45,7 @@ def health_check(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health", health_check, name="health"),
+    path("app", TemplateView.as_view(template_name="app.html"), name="app"),
     path("tasks/<uuid:task_id>/", TaskStatusView.as_view(), name="task-status"),
     path("", include("apps.accounts.urls")),
     path("", include("apps.catalog.urls")),
