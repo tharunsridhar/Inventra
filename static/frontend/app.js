@@ -320,8 +320,8 @@ async function renderProducts() {
               <tr>
                 <td class="mono">${esc(p.sku)}</td>
                 <td>${esc(p.name)}</td>
-                <td>${esc(catName(p.category_id))}</td>
-                <td>${esc(supName(p.supplier_id))}</td>
+                <td>${esc(catName(p.category))}</td>
+                <td>${esc(supName(p.supplier))}</td>
                 <td>${money(p.cost_price)}</td>
                 <td>${money(p.selling_price)}</td>
                 <td>${p.current_stock}</td>
@@ -370,8 +370,8 @@ function openProductForm(product) {
       <button class="btn btn-primary" id="save-btn">${isEdit ? "Save changes" : "Create product"}</button>
     </div>`, (body) => {
     if (product) {
-      body.querySelector("#f-category").value = product.category_id;
-      body.querySelector("#f-supplier").value = product.supplier_id;
+      body.querySelector("#f-category").value = product.category;
+      body.querySelector("#f-supplier").value = product.supplier;
     }
     body.querySelector("#cancel-btn").addEventListener("click", closeModal);
     body.querySelector("#save-btn").addEventListener("click", async () => {
@@ -379,8 +379,8 @@ function openProductForm(product) {
         sku: body.querySelector("#f-sku").value.trim(),
         name: body.querySelector("#f-name").value.trim(),
         description: body.querySelector("#f-desc").value.trim() || null,
-        category_id: body.querySelector("#f-category").value,
-        supplier_id: body.querySelector("#f-supplier").value,
+        category: body.querySelector("#f-category").value,
+        supplier: body.querySelector("#f-supplier").value,
         cost_price: body.querySelector("#f-cost").value,
         selling_price: body.querySelector("#f-price").value,
         low_stock_threshold: Number(body.querySelector("#f-threshold").value),
@@ -495,8 +495,8 @@ async function renderPurchases() {
         <table><thead><tr><th>Supplier</th><th>Items</th><th>Status</th><th>Created</th><th></th></tr></thead>
         <tbody>${data.items.length === 0 ? `<tr><td colspan="5" class="table-empty">No purchase orders</td></tr>` : data.items.map((po) => `
           <tr>
-            <td>${esc(supName(po.supplier_id))}</td>
-            <td class="muted">${po.items.map((i) => `${esc(prodName(i.product_id))} × ${i.quantity}`).join(", ")}</td>
+            <td>${esc(supName(po.supplier))}</td>
+            <td class="muted">${po.items.map((i) => `${esc(prodName(i.product))} × ${i.quantity}`).join(", ")}</td>
             <td>${statusBadge(po.status)}</td>
             <td class="muted">${dt(po.created_at)}</td>
             <td class="row-actions">${po.status === "ordered" ? `<button class="btn btn-primary btn-sm" data-receive-po="${po.id}">Receive</button>` : ""}</td>
@@ -580,7 +580,7 @@ async function renderSales() {
         <tbody>${data.items.length === 0 ? `<tr><td colspan="6" class="table-empty">No sales orders</td></tr>` : data.items.map((so) => `
           <tr>
             <td>${esc(so.customer_name || "—")}</td>
-            <td class="muted">${so.items.map((i) => `${esc(prodName(i.product_id))} × ${i.quantity}`).join(", ")}</td>
+            <td class="muted">${so.items.map((i) => `${esc(prodName(i.product))} × ${i.quantity}`).join(", ")}</td>
             <td>${statusBadge(so.status)}</td>
             <td class="mono">${esc(so.invoice_number || "—")}</td>
             <td class="muted">${dt(so.created_at)}</td>
@@ -601,20 +601,34 @@ async function renderSales() {
   bindPagination("sales", renderSales);
 }
 
+// Django generates the invoice as a PDF asynchronously via Celery (the
+// FastAPI port returned invoice line-item JSON synchronously instead) -
+// this dispatches the task, polls /tasks/{id}/ until it's done, then links
+// to the finished PDF rather than rendering invoice line items as HTML.
 async function showInvoice(soId) {
+  openModal("Generating invoice", `<p class="muted">Working on it…</p>`, () => {});
   try {
-    const inv = await api(`/sales-orders/${soId}/invoice`);
-    const prodName = (id) => state.products.find((p) => p.id === id)?.name || id;
-    openModal(`Invoice ${inv.invoice_number}`, `
-      <p class="muted">${esc(inv.customer_name || "Walk-in customer")} ${inv.customer_phone ? "· " + esc(inv.customer_phone) : ""}</p>
-      <p class="muted">${dt(inv.invoiced_at)}</p>
-      <table style="margin-top:12px"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead>
-      <tbody>${inv.items.map((i) => `<tr><td>${esc(prodName(i.product_id))}</td><td>${i.quantity}</td><td>${money(i.unit_price)}</td><td>${money(i.quantity * i.unit_price)}</td></tr>`).join("")}</tbody></table>
-      <div class="form-actions" style="justify-content:space-between;align-items:center">
-        <strong>Total: ${money(inv.total_amount)}</strong>
-        <button class="btn" id="cancel-btn">Close</button>
-      </div>`, (body) => body.querySelector("#cancel-btn").addEventListener("click", closeModal));
-  } catch (e) { toast(e.message, "error"); }
+    const dispatch = await api(`/sales-orders/${soId}/invoice`);
+    const taskId = dispatch.task_id;
+    let result = null;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      result = await api(`/tasks/${taskId}/`);
+      if (result.status === "SUCCESS" || result.status === "FAILURE") break;
+    }
+    if (result?.status === "SUCCESS" && result.result_url) {
+      openModal("Invoice ready", `
+        <p>Your invoice PDF is ready.</p>
+        <div class="form-actions" style="justify-content:space-between;align-items:center">
+          <a class="btn btn-primary" href="${result.result_url}" target="_blank" rel="noopener">Open PDF</a>
+          <button class="btn" id="cancel-btn">Close</button>
+        </div>`, (body) => body.querySelector("#cancel-btn").addEventListener("click", closeModal));
+    } else {
+      openModal("Invoice failed", `<p class="muted">${esc(result?.error || "Timed out waiting for the invoice to generate.")}</p>
+        <div class="form-actions"><button class="btn" id="cancel-btn">Close</button></div>`,
+        (body) => body.querySelector("#cancel-btn").addEventListener("click", closeModal));
+    }
+  } catch (e) { toast(e.message, "error"); closeModal(); }
 }
 
 function openSalesOrderForm() {
@@ -662,8 +676,8 @@ async function renderReturns() {
         <table><thead><tr><th>Sales order</th><th>Product</th><th>Qty</th><th>Reason</th><th>Status</th><th></th></tr></thead>
         <tbody>${data.items.length === 0 ? `<tr><td colspan="6" class="table-empty">No returns filed</td></tr>` : data.items.map((r) => `
           <tr>
-            <td class="mono">${r.sales_order_id.slice(0, 8)}…</td>
-            <td>${esc(prodName(r.product_id))}</td>
+            <td class="mono">${r.sales_order.slice(0, 8)}…</td>
+            <td>${esc(prodName(r.product))}</td>
             <td>${r.quantity}</td>
             <td class="muted">${esc(r.reason)}</td>
             <td>${statusBadge(r.status)}</td>
@@ -687,8 +701,8 @@ async function renderReturns() {
       body.querySelector("#save-btn").addEventListener("click", async () => {
         try {
           await api("/returns", { method: "POST", body: {
-            sales_order_id: body.querySelector("#f-so").value.trim(),
-            product_id: body.querySelector("#f-product").value,
+            sales_order: body.querySelector("#f-so").value.trim(),
+            product: body.querySelector("#f-product").value,
             quantity: Number(body.querySelector("#f-qty").value),
             reason: body.querySelector("#f-reason").value.trim(),
           }});
@@ -745,7 +759,7 @@ async function loadRecentDamage() {
     <div class="panel"><div class="panel-body">
       <table><thead><tr><th>Product</th><th>Qty</th><th>Reason</th><th>When</th></tr></thead>
       <tbody>${data.items.length === 0 ? `<tr><td colspan="4" class="table-empty">No damage logged yet</td></tr>` : data.items.map((t) => `
-        <tr><td>${esc(prodName(t.product_id))}</td><td>${t.quantity}</td><td class="muted">${esc(t.reason || "—")}</td><td class="muted">${dt(t.created_at)}</td></tr>`).join("")}
+        <tr><td>${esc(prodName(t.product))}</td><td>${t.quantity}</td><td class="muted">${esc(t.reason || "—")}</td><td class="muted">${dt(t.created_at)}</td></tr>`).join("")}
       </tbody></table>
     </div></div>`;
 }
@@ -781,7 +795,7 @@ async function renderTransactions() {
       <div class="panel-body">
         <table><thead><tr><th>Product</th><th>Type</th><th>Qty</th><th>Reason</th><th>When</th></tr></thead>
         <tbody>${data.items.length === 0 ? `<tr><td colspan="5" class="table-empty">No transactions</td></tr>` : data.items.map((t) => `
-          <tr><td>${esc(prodName(t.product_id))}</td><td>${statusBadge(t.transaction_type)}</td><td>${t.quantity}</td><td class="muted">${esc(t.reason || "—")}</td><td class="muted">${dt(t.created_at)}</td></tr>`).join("")}
+          <tr><td>${esc(prodName(t.product))}</td><td>${statusBadge(t.transaction_type)}</td><td>${t.quantity}</td><td class="muted">${esc(t.reason || "—")}</td><td class="muted">${dt(t.created_at)}</td></tr>`).join("")}
         </tbody></table>
         ${pagination(data, "transactions")}
       </div>
