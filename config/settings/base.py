@@ -102,6 +102,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Generated invoice PDFs (Phase 4). Local disk only - fine for this spec's
 # scope, but a real multi-instance deployment would need this on shared/

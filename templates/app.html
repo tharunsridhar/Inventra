@@ -1,207 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Inventra</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    background: #f4f5f7;
-    margin: 0;
-    padding: 40px 16px;
-    color: #1a1a1a;
-  }
-  .card {
-    max-width: 420px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
-    padding: 32px;
-  }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  p.sub { color: #666; margin: 0 0 24px; font-size: 14px; }
-  .tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; }
-  .tab {
-    flex: 1; text-align: center; padding: 10px; cursor: pointer;
-    color: #888; font-weight: 600; font-size: 14px; border-bottom: 2px solid transparent;
-  }
-  .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
-  form { display: none; flex-direction: column; gap: 12px; }
-  form.active { display: flex; }
-  label { font-size: 13px; font-weight: 600; color: #333; }
-  input {
-    padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
-  }
-  input:focus { outline: none; border-color: #2563eb; }
-  button {
-    margin-top: 8px; padding: 11px; background: #2563eb; color: #fff; border: none;
-    border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-  button:hover { background: #1d4ed8; }
-  .msg { font-size: 13px; margin-top: 12px; padding: 10px; border-radius: 6px; display: none; }
-  .msg.error { background: #fee2e2; color: #991b1b; display: block; }
-  .msg.success { background: #dcfce7; color: #166534; display: block; }
-  #dashboard { display: none; }
-  #dashboard h2 { font-size: 18px; margin-bottom: 4px; }
-  #dashboard p.who { color: #666; font-size: 13px; margin-bottom: 20px; }
-  .product-list { list-style: none; padding: 0; margin: 0; }
-  .product-list li {
-    padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px;
-    display: flex; justify-content: space-between;
-  }
-  .empty { color: #999; font-size: 13px; padding: 12px 0; }
-  .logout { background: transparent; color: #999; border: 1px solid #ddd; margin-top: 20px; }
-  .logout:hover { background: #f5f5f5; color: #333; }
-</style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inventra — Inventory Management</title>
+<link rel="stylesheet" href="/static/frontend/styles.css" />
 </head>
 <body>
 
-<div class="card" id="authCard">
-  <h1>Inventra</h1>
-  <p class="sub">Role-based inventory management</p>
-
-  <div class="tabs">
-    <div class="tab active" data-tab="login">Log in</div>
-    <div class="tab" data-tab="register">Sign up</div>
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">IV</div>
+      <h1>Inventra</h1>
+      <p>Inventory Management System</p>
+    </div>
+    <form id="login-form">
+      <label>Email
+        <input type="email" id="login-email" required autocomplete="username" placeholder="you@company.com" />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+      <p id="login-error" class="form-error hidden"></p>
+    </form>
+    <div class="login-hint">
+      <strong>Demo accounts</strong> (run <code>seed.py</code> first)
+      <ul>
+        <li><code>admin@inventra.com</code> / <code>admin123</code></li>
+        <li><code>manager@inventra.com</code> / <code>manager123</code></li>
+        <li><code>employee@inventra.com</code> / <code>employee123</code></li>
+      </ul>
+    </div>
   </div>
-
-  <form id="loginForm" class="active">
-    <label>Email</label>
-    <input type="email" id="loginEmail" required value="admin@inventra.com">
-    <label>Password</label>
-    <input type="password" id="loginPassword" required value="admin123">
-    <button type="submit">Log in</button>
-  </form>
-
-  <form id="registerForm">
-    <label>Full name</label>
-    <input type="text" id="registerName" required>
-    <label>Email</label>
-    <input type="email" id="registerEmail" required>
-    <label>Password</label>
-    <input type="password" id="registerPassword" required minlength="8">
-    <button type="submit">Sign up</button>
-  </form>
-
-  <div class="msg" id="authMsg"></div>
 </div>
 
-<div class="card" id="dashboard">
-  <h2>Welcome</h2>
-  <p class="who" id="whoami"></p>
-  <div id="productsBox">
-    <strong style="font-size:14px;">Products</strong>
-    <ul class="product-list" id="productList"></ul>
+<!-- ===================== APP SHELL ===================== -->
+<div id="app-shell" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">IV</div>
+      <span>Inventra</span>
+    </div>
+    <nav id="nav-list" class="nav-list">
+      <button class="nav-item" data-view="dashboard">📊 Dashboard</button>
+      <button class="nav-item" data-view="products">📦 Products</button>
+      <button class="nav-item" data-view="catalog">🏷️ Categories &amp; Suppliers</button>
+      <button class="nav-item" data-view="purchases">🛒 Purchase Orders</button>
+      <button class="nav-item" data-view="sales">💳 Sales Orders</button>
+      <button class="nav-item" data-view="returns" data-role="admin,manager">↩️ Returns</button>
+      <button class="nav-item" data-view="damage" data-role="admin,manager">⚠️ Damage Write-off</button>
+      <button class="nav-item" data-view="transactions">📜 Transactions</button>
+      <button class="nav-item" data-view="reports" data-role="admin,manager">📈 Reports</button>
+      <button class="nav-item" data-view="users" data-role="admin">👤 Users</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="notif-btn" class="nav-item notif-btn">🔔 Notifications <span id="notif-badge" class="badge hidden">0</span></button>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <h2 id="view-title">Dashboard</h2>
+      <div class="topbar-right">
+        <span id="user-chip" class="user-chip"></span>
+        <button id="logout-btn" class="btn btn-ghost">Log out</button>
+      </div>
+    </header>
+
+    <main id="content" class="content"></main>
   </div>
-  <button class="logout" id="logoutBtn">Log out</button>
 </div>
 
-<script>
-const authCard = document.getElementById('authCard');
-const dashboard = document.getElementById('dashboard');
-const msg = document.getElementById('authMsg');
+<!-- ===================== NOTIFICATIONS DRAWER ===================== -->
+<div id="notif-drawer" class="drawer hidden">
+  <div class="drawer-header">
+    <h3>Notifications</h3>
+    <button id="notif-close" class="btn btn-ghost">✕</button>
+  </div>
+  <div id="notif-list" class="drawer-body"></div>
+</div>
+<div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('form').forEach(f => f.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
-    msg.style.display = 'none';
-  });
-});
+<!-- ===================== MODAL ===================== -->
+<div id="modal-backdrop" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Title</h3>
+      <button id="modal-close" class="btn btn-ghost">✕</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
 
-function showMsg(text, isError) {
-  msg.textContent = text;
-  msg.className = 'msg ' + (isError ? 'error' : 'success');
-}
+<!-- ===================== TOASTS ===================== -->
+<div id="toast-container" class="toast-container"></div>
 
-async function afterLogin(access, email) {
-  localStorage.setItem('inventra_token', access);
-  authCard.style.display = 'none';
-  dashboard.style.display = 'block';
-  document.getElementById('whoami').textContent = 'Logged in as ' + email;
-
-  try {
-    const res = await fetch('/products/', { headers: { Authorization: 'Bearer ' + access } });
-    const data = await res.json();
-    const list = document.getElementById('productList');
-    list.innerHTML = '';
-    if (!data.results || data.results.length === 0) {
-      list.innerHTML = '<li class="empty">No products yet</li>';
-    } else {
-      data.results.forEach(p => {
-        const li = document.createElement('li');
-        li.innerHTML = '<span>' + p.name + '</span><span>' + p.current_stock + ' in stock</span>';
-        list.appendChild(li);
-      });
-    }
-  } catch (e) {
-    document.getElementById('productList').innerHTML = '<li class="empty">Could not load products</li>';
-  }
-}
-
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  try {
-    const res = await fetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showMsg(data.detail || 'Login failed', true);
-      return;
-    }
-    afterLogin(data.access, email);
-  } catch (err) {
-    console.error('Login request failed:', err);
-    showMsg('Network error: ' + err.message, true);
-  }
-});
-
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const full_name = document.getElementById('registerName').value;
-  const email = document.getElementById('registerEmail').value;
-  const password = document.getElementById('registerPassword').value;
-  try {
-    const res = await fetch('/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ full_name, email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showMsg(JSON.stringify(data), true);
-      return;
-    }
-    showMsg('Account created - logging you in...', false);
-    const loginRes = await fetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const loginData = await loginRes.json();
-    if (loginRes.ok) afterLogin(loginData.access, email);
-  } catch (err) {
-    console.error('Register request failed:', err);
-    showMsg('Network error: ' + err.message, true);
-  }
-});
-
-document.getElementById('logoutBtn').addEventListener('click', () => {
-  localStorage.removeItem('inventra_token');
-  dashboard.style.display = 'none';
-  authCard.style.display = 'block';
-  document.getElementById('loginForm').reset();
-});
-</script>
-
+<script src="/static/frontend/app.js"></script>
 </body>
 </html>

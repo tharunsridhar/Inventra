@@ -17,6 +17,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY apps ./apps
 COPY config ./config
 COPY templates ./templates
+COPY static ./static
 COPY manage.py ./
 RUN uv sync --frozen --no-dev
 
