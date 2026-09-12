@@ -160,7 +160,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     }
     afterLogin(data.access, email);
   } catch (err) {
-    showMsg('Network error - could not reach the server', true);
+    console.error('Login request failed:', err);
+    showMsg('Network error: ' + err.message, true);
   }
 });
 
@@ -189,7 +190,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     const loginData = await loginRes.json();
     if (loginRes.ok) afterLogin(loginData.access, email);
   } catch (err) {
-    showMsg('Network error - could not reach the server', true);
+    console.error('Register request failed:', err);
+    showMsg('Network error: ' + err.message, true);
   }
 });
 
