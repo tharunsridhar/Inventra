@@ -74,6 +74,22 @@ async function api(path, { method = "GET", body, auth = true, query } = {}) {
     }
     throw new Error(msg);
   }
+  // DRF's pagination shape is {count, next, previous, results}; this
+  // frontend was written against FastAPI's {items, total, page, page_size}.
+  // Normalizing here (instead of at each of the ~15 call sites that read
+  // .items/.total/.page/.page_size) keeps the translation in one place.
+  // page/page_size come from the request's own query, not the response -
+  // DRF's default pagination doesn't echo them back.
+  if (data && typeof data === "object" && Array.isArray(data.results) && "count" in data) {
+    const pageSize = Number(query?.page_size) || data.results.length || 1;
+    return {
+      items: data.results,
+      total: data.count,
+      page: Number(query?.page) || 1,
+      page_size: pageSize,
+      pages: Math.max(1, Math.ceil(data.count / pageSize)),
+    };
+  }
   return data;
 }
 
