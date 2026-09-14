@@ -8,7 +8,7 @@ That's the headline from Phase 6's load test, not a claim. Concurrent requests h
 
 *(No GIF embedded here: one was captured live against a running Locust dashboard during this work, but the exported file's location couldn't be resolved in the sandboxed environment this was built in. `loadtest/README.md` reproduces the same run on demand, screen-recordable in any normal terminal.)*
 
-Same inventory management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/fastapi), rebuilt on Django 5 + Django REST Framework. This branch (`v2`) adds caching, background jobs, rate limiting, structured logging, and the load-test evidence above on top of the working v1 domain port. See [FastAPI vs. Django](#fastapi-vs-django) for the original stack comparison.
+Same inventory management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/fastapi), rebuilt on Django 5 + Django REST Framework. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a bundled login and dashboard frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend. See [FastAPI vs. Django](#fastapi-vs-django) for the original stack comparison.
 
 - Products, suppliers, purchase orders, sales orders, returns, damage write offs
 - Append only stock ledger, enforced twice (no write route, and the Admin can't edit or delete it either)
@@ -121,6 +121,7 @@ docker compose up --build
 ```
 
 Starts postgres, redis, the api, a Celery worker, and Celery beat. Reaches **http://localhost:8000**:
+- `/app`: the bundled login and dashboard frontend (plain HTML/JS, served via Django templates and static files, no separate build step)
 - `/admin`: Django Admin (create a superuser first, see below)
 - any resource path, e.g. `/products`: DRF's browsable API (HTML form + JSON, no separate client needed)
 - `/health`: reports database, redis, and celery status (the last one pings the actual worker)
