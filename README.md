@@ -81,7 +81,7 @@ flowchart LR
 - pytest + pytest-django
 - Docker, GitHub Actions
 
-No frontend in this port. It's API + Admin only, since the frontend isn't part of what's being compared between the two backends.
+Also includes a bundled frontend: plain HTML/JS served via Django templates and `{% static %}`, no separate build step or JS framework. See `/app` in Quickstart above.
 
 ## Key engineering decisions
 
