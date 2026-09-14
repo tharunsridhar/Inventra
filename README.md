@@ -1,4 +1,4 @@
-# Inventra (Django port)
+# Inventra
 
 ![CI](https://github.com/tharunsridhar/Inventra/actions/workflows/ci.yml/badge.svg)
 
@@ -8,7 +8,7 @@ That's the headline from Phase 6's load test, not a claim. Concurrent requests h
 
 *(No GIF embedded here: one was captured live against a running Locust dashboard during this work, but the exported file's location couldn't be resolved in the sandboxed environment this was built in. `loadtest/README.md` reproduces the same run on demand, screen-recordable in any normal terminal.)*
 
-Same inventory management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/v0), rebuilt on Django 5 + Django REST Framework. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a bundled login and dashboard frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend. See [FastAPI vs. Django](#fastapi-vs-django) for the original stack comparison.
+Inventory management backend for a single-warehouse, single-currency retailer, built on Django 5 + Django REST Framework: products, suppliers, purchase orders, sales orders, returns, and a stock movement ledger that's never edited or deleted, behind role based JWT auth. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a bundled login and dashboard frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend.
 
 - Products, suppliers, purchase orders, sales orders, returns, damage write offs
 - Append only stock ledger, enforced twice (no write route, and the Admin can't edit or delete it either)
@@ -86,8 +86,8 @@ Also includes a bundled frontend: plain HTML/JS served via Django templates and 
 ## Key engineering decisions
 
 **Immutable transaction ledger, enforced twice.**
-- `InventoryTransactionViewSet` is a `ReadOnlyModelViewSet`. There's no create/update/delete route registered for it at all, the same guarantee as Inventra's transactions router only ever defining a `GET`.
-- Django adds a second, independent enforcement point Inventra doesn't have: `InventoryTransactionAdmin` hard disables `has_add_permission`, `has_change_permission`, and `has_delete_permission`, so even a superuser in the Django Admin can't edit or delete a ledger row. See [apps/inventory/admin.py](apps/inventory/admin.py).
+- `InventoryTransactionViewSet` is a `ReadOnlyModelViewSet`. There's no create/update/delete route registered for it at all, enforcing an immutable ledger at the routing layer.
+- A second, independent enforcement point backs that up: `InventoryTransactionAdmin` hard disables `has_add_permission`, `has_change_permission`, and `has_delete_permission`, so even a superuser in the Django Admin can't edit or delete a ledger row. See [apps/inventory/admin.py](apps/inventory/admin.py).
 
 **Idempotency guarantees.**
 - `POST /purchase-orders/{id}/receive` and `POST /sales-orders/{id}/complete` can be called more than once safely.
@@ -110,7 +110,7 @@ Also includes a bundled frontend: plain HTML/JS served via Django templates and 
 - Real captured example, both processes: [docs/v2/LOG_SAMPLE.md](docs/v2/LOG_SAMPLE.md). Rationale: [docs/v2/adr/0004-request-tracing.md](docs/v2/adr/0004-request-tracing.md).
 
 **Revocable refresh tokens.**
-- `djangorestframework-simplejwt`'s `token_blacklist` app is the DRF idiomatic version of Inventra's DB stored `revoked` boolean.
+- `djangorestframework-simplejwt`'s `token_blacklist` app records every rotated out refresh token in the database, so a stolen or logged out token can be rejected immediately rather than trusted until it naturally expires.
 - `ROTATE_REFRESH_TOKENS` + `BLACKLIST_AFTER_ROTATION` record every rotated out token, and `POST /auth/logout` blacklists the current one, so `/auth/refresh` rejects it immediately afterward.
 
 ## Quickstart
@@ -225,40 +225,6 @@ Dockerfile, docker-compose.yml, railway.json - see Quickstart / Deployment
 ```
 
 Five apps, not eleven. `inventory` groups PurchaseOrder/SalesOrder/Return/InventoryTransaction together deliberately, since they're all tightly coupled around the one stock ledger. `core` isn't a Django app (no models) - just where the v2 cross-cutting infrastructure (caching, throttling, request tracing, the locking-kill-switch guard) lives, since none of it belongs to one domain app.
-
-## FastAPI vs. Django
-
-Same domain, same database, same concurrency guarantees, built twice. This is the honest version of that comparison, not a diplomatic "both are great" writeup, but where each one actually won.
-
-**Development speed.** Django won this decisively for a CRUD and workflow domain like this one.
-- The custom User model, JWT auth, and the admin interface all came from installing an app and writing a few settings lines, not hand rolled code.
-- SimpleJWT's `token_blacklist` app replaced what was a full `RefreshToken` model, revoke logic, and matching Alembic migration in Inventra.
-- `ModelViewSet` + `DefaultRouter` generates list/create/retrieve/update/delete routing from one class. FastAPI needed a handwritten function per verb per resource.
-- The tradeoff showed up on the two custom transaction endpoints (`/receive`, `/complete`): DRF's generic view conventions actively fight you once the logic stops being "CRUD", and both ended up as manually written `@action` methods with the framework mostly out of the way. The win is concentrated in the boilerplate heavy 80%, not the interesting 20%.
-
-**The Django Admin.** This is the single biggest capability gap between the two stacks, not a minor convenience.
-- Inventra has no equivalent at all. Internal tooling (fixing a bad order, adjusting a supplier record, looking up a user) means writing an endpoint or reaching for `psql`.
-- Here it's free, and it's not just free CRUD: `InventoryTransactionAdmin`'s hard disabled add/change/delete permissions mean the immutable ledger guarantee holds in the one interface that bypasses the API layer too.
-- The cost is real though. The Admin is a second UI to keep in sync with the domain model, and it's a Django only concept, so it doesn't transfer if the next job's stack doesn't include Django.
-
-**ORM differences.**
-- Django's ORM is more concise for the common case: `select_for_update()`, `bulk_create()`, `F()` expressions, and migrations autogenerated from model diffs all require less code than SQLAlchemy 2.0's explicit `Session`/`select()`/Alembic-revision workflow.
-- SQLAlchemy wins on explicitness once queries get complex. Alembic revisions are readable diffs you write and review, while `makemigrations` output requires trusting Django's diff detection.
-- For this project's `SELECT ... FOR UPDATE` locking pattern, both express it in one line, no real difference at the point that mattered most.
-
-**Async support.** FastAPI's is the more honest story for a fully async I/O path.
-- PhotoShare (the other port in this series) runs async SQLAlchemy, async Redis, and Celery end to end with no sync boundary anywhere.
-- Django 5 supports async views and an async ORM interface, but this project's `select_for_update()` locking pattern and DRF itself are still fundamentally sync underneath. This v2 phase's own async work (Celery, invoice generation) runs alongside the sync web process rather than inside an async request path, the same "separate worker process" shape Celery always has regardless of framework.
-- Going async here would mean either accepting a sync/async boundary mid-request or dropping DRF for something like Django Ninja. Not a natural fit for what this specific service needs (transactional writes, not high concurrency I/O), but a genuine limitation for services that do need it.
-
-**Ecosystem maturity.**
-- Django's is broader and older. Admin, auth, the ORM, migrations, and forms all ship in one coherent package with a couple decades of production hardening and a huge base of vetted third party apps (`django-filter`, `whitenoise`, `simplejwt`, `django-redis` here).
-- FastAPI's ecosystem is newer and more assembled by hand. Every one of those pieces is a separate choice you make and wire together yourself.
-- That's more decisions to get right, but also less framework opinion to work around when a project's shape doesn't match Django's assumptions.
-
-**When I'd choose which.**
-- Django for an admin heavy, CRUD and workflow dominant internal tool where "someone needs to fix a bad record without me shipping a new endpoint" is a real, recurring need. This project is exactly that shape.
-- FastAPI for an async native, latency sensitive, or API only service with no internal tooling surface. PhotoShare's Celery backed image pipeline is exactly that shape.
 
 ## Deferred
 
