@@ -8,7 +8,7 @@ That's the headline from Phase 6's load test, not a claim. Concurrent requests h
 
 *(No GIF embedded here: one was captured live against a running Locust dashboard during this work, but the exported file's location couldn't be resolved in the sandboxed environment this was built in. `loadtest/README.md` reproduces the same run on demand, screen-recordable in any normal terminal.)*
 
-Same inventory management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/fastapi), rebuilt on Django 5 + Django REST Framework. This branch (`v2`) adds caching, background jobs, rate limiting, structured logging, and the load-test evidence above on top of the working v1 domain port. See [FastAPI vs. Django](#fastapi-vs-django) for the original stack comparison.
+Same inventory management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/fastapi), rebuilt on Django 5 + Django REST Framework. This branch (`v1`) is the API-only build: caching, background jobs, rate limiting, structured logging, and the load-test evidence above, no bundled frontend. See the [`v2`](https://github.com/tharunsridhar/Inventra/tree/v2) branch for the same backend with a working login and dashboard UI on top.
 
 - Products, suppliers, purchase orders, sales orders, returns, damage write offs
 - Append only stock ledger, enforced twice (no write route, and the Admin can't edit or delete it either)
