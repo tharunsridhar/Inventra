@@ -1,4 +1,4 @@
-# Inventra (Django port)
+# Inventra
 
 ![CI](https://github.com/tharunsridhar/Inventra/actions/workflows/ci.yml/badge.svg)
 
@@ -8,7 +8,7 @@ That's the headline from Phase 6's load test, not a claim. Concurrent requests h
 
 *(No GIF embedded here: one was captured live against a running Locust dashboard during this work, but the exported file's location couldn't be resolved in the sandboxed environment this was built in. `loadtest/README.md` reproduces the same run on demand, screen-recordable in any normal terminal.)*
 
-Same inventory management domain as [Inventra (FastAPI)](https://github.com/tharunsridhar/Inventra/tree/v0), rebuilt on Django 5 + Django REST Framework. This branch (`v1`) is the API-only build: caching, background jobs, rate limiting, structured logging, and the load-test evidence above, no bundled frontend. See the [`v2`](https://github.com/tharunsridhar/Inventra/tree/v2) branch for the same backend with a working login and dashboard UI on top.
+Inventory management backend for a single-warehouse, single-currency retailer, built on Django 5 + Django REST Framework: products, suppliers, purchase orders, sales orders, returns, and a stock movement ledger that's never edited or deleted, behind role based JWT auth. This branch (`v1`) is the API-only build: caching, background jobs, rate limiting, structured logging, and the load-test evidence above, no bundled frontend. See the [`v2`](https://github.com/tharunsridhar/Inventra/tree/v2) branch for the same backend with a working login and dashboard UI on top.
 
 - Products, suppliers, purchase orders, sales orders, returns, damage write offs
 - Append only stock ledger, enforced twice (no write route, and the Admin can't edit or delete it either)
@@ -81,13 +81,13 @@ flowchart LR
 - pytest + pytest-django
 - Docker, GitHub Actions
 
-No frontend in this port. It's API + Admin only, since the frontend isn't part of what's being compared between the two backends.
+No frontend on this branch. API + Django Admin only, see the [`v2`](https://github.com/tharunsridhar/Inventra/tree/v2) branch for the bundled login and dashboard UI.
 
 ## Key engineering decisions
 
 **Immutable transaction ledger, enforced twice.**
-- `InventoryTransactionViewSet` is a `ReadOnlyModelViewSet`. There's no create/update/delete route registered for it at all, the same guarantee as Inventra's transactions router only ever defining a `GET`.
-- Django adds a second, independent enforcement point Inventra doesn't have: `InventoryTransactionAdmin` hard disables `has_add_permission`, `has_change_permission`, and `has_delete_permission`, so even a superuser in the Django Admin can't edit or delete a ledger row. See [apps/inventory/admin.py](apps/inventory/admin.py).
+- `InventoryTransactionViewSet` is a `ReadOnlyModelViewSet`. There's no create/update/delete route registered for it at all, enforcing an immutable ledger at the routing layer.
+- A second, independent enforcement point backs that up: `InventoryTransactionAdmin` hard disables `has_add_permission`, `has_change_permission`, and `has_delete_permission`, so even a superuser in the Django Admin can't edit or delete a ledger row. See [apps/inventory/admin.py](apps/inventory/admin.py).
 
 **Idempotency guarantees.**
 - `POST /purchase-orders/{id}/receive` and `POST /sales-orders/{id}/complete` can be called more than once safely.
@@ -110,7 +110,7 @@ No frontend in this port. It's API + Admin only, since the frontend isn't part o
 - Real captured example, both processes: [docs/v2/LOG_SAMPLE.md](docs/v2/LOG_SAMPLE.md). Rationale: [docs/v2/adr/0004-request-tracing.md](docs/v2/adr/0004-request-tracing.md).
 
 **Revocable refresh tokens.**
-- `djangorestframework-simplejwt`'s `token_blacklist` app is the DRF idiomatic version of Inventra's DB stored `revoked` boolean.
+- `djangorestframework-simplejwt`'s `token_blacklist` app records every rotated out refresh token in the database, so a stolen or logged out token can be rejected immediately rather than trusted until it naturally expires.
 - `ROTATE_REFRESH_TOKENS` + `BLACKLIST_AFTER_ROTATION` record every rotated out token, and `POST /auth/logout` blacklists the current one, so `/auth/refresh` rejects it immediately afterward.
 
 ## Quickstart
