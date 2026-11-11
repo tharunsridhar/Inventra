@@ -229,3 +229,5 @@ Five apps, not eleven. `inventory` groups PurchaseOrder/SalesOrder/Return/Invent
 ## Deferred
 
 Multi-warehouse support, partial PO receiving, PO approval workflow, supplier returns, email based password reset/notifications, file storage beyond local disk for generated PDFs (a real multi-instance deployment needs shared/object storage, see `config/settings/base.py`'s `MEDIA_ROOT` comment). Everything else on the original "deferred to v2" list (rate limiting, structured logging, Redis caching, background jobs, PDF invoices) is now implemented, see the sections above.
+
+<!-- last updated: 2026-11-11 -->
