@@ -81,7 +81,45 @@ flowchart LR
 - pytest + pytest-django
 - Docker, GitHub Actions
 
-Also includes a bundled frontend: plain HTML/JS served via Django templates and `{% static %}`, no separate build step or JS framework. See `/app` in Quickstart above.
+Also includes a bundled frontend: plain HTML/JS served via Django templates and `{% static %}`, no separate build step or JS framework. See the [Frontend](#frontend) section below.
+
+## Frontend
+
+A single-page app at `/app`, written in vanilla JS (about 1,000 lines in [static/frontend/app.js](static/frontend/app.js)) with one Django template, [templates/app.html](templates/app.html). No framework, no bundler, no npm. Django serves the HTML and the static files, and the JS talks to the same REST API documented below.
+
+**Views**
+- Dashboard: stat cards (products, categories, suppliers, users, purchase and sales order counts, low stock, out of stock)
+- Products: search, stock status filter (in stock, low, out), pagination, create, edit, delete
+- Categories & Suppliers: list, create, delete
+- Purchase Orders: list, create with line items, receive (confirm dialog, then stock goes up)
+- Sales Orders: list, create with line items, complete (stock goes down), invoice
+- Returns: list, create, approve
+- Damage Write-off: log a write-off with a reason, see recent damage entries
+- Transactions: read-only stock ledger, filterable by type, paginated
+- Reports: product, purchase, sales and inventory reports with a date range (shown as raw JSON for now)
+- Users: create, change role, disable and enable, reset password
+- Notifications: drawer with an unread badge, mark as read
+
+**Auth**
+- Email and password login against `/auth/login`, tokens kept in `localStorage`
+- Every request sends the access token as a Bearer header
+- On a 401 the client calls `/auth/refresh`, stores the rotated token pair, and retries the original request
+- If the refresh fails it logs out and returns to the login screen
+- Logout calls `/auth/logout` so the refresh token is blacklisted server side
+
+**Role based visibility**
+- The nav is filtered by the signed-in role: Returns, Damage Write-off and Reports are Admin and Manager only, Users is Admin only
+- Product edit and delete controls only render for Admin and Manager
+- Employees get a friendly message on the Dashboard instead of an error
+- This is UI polish only. The real enforcement is the DRF permission classes on the API, so hiding a button never grants or removes access.
+
+**Async invoices**
+- Invoice generation is a Celery job. The UI requests the invoice, polls `/tasks/{id}` until it finishes, then links to the PDF.
+
+**Stack**
+- Vanilla JS single page app, fetch API, no dependencies
+- Served by Django (`TemplateView` at `/app`, static files via whitenoise)
+- Same origin as the API, so no CORS setup is needed for the bundled UI
 
 ## Key engineering decisions
 
