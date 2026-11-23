@@ -6,7 +6,9 @@
 
 That's the headline from Phase 6's load test, not a claim. Concurrent requests hitting the same product without row-level locking don't fail loudly, they corrupt the ledger silently: the response looks like a success, the invoice gets issued, and the stock count just quietly stops matching the sales it recorded. Full numbers, the mechanism, and how to reproduce it: [Performance](#performance) below, full writeup in [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md).
 
-*(No GIF embedded here: one was captured live against a running Locust dashboard during this work, but the exported file's location couldn't be resolved in the sandboxed environment this was built in. `loadtest/README.md` reproduces the same run on demand, screen-recordable in any normal terminal.)*
+<!-- TODO: record docs/demo.gif (login, purchase order, sale, ledger, locked vs unlocked load test), then replace this comment with: ![Inventra demo](docs/demo.gif) -->
+
+Demo recording coming soon. Until then, `loadtest/README.md` reproduces the same run on demand.
 
 Inventory management backend for a single-warehouse, single-currency retailer, built on Django 5 + Django REST Framework: products, suppliers, purchase orders, sales orders, returns, and a stock movement ledger that's never edited or deleted, behind role based JWT auth. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a bundled login and dashboard frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend.
 
@@ -30,6 +32,7 @@ Measured on a single local dev machine (not production hardware, see [docs/v2/LO
 Both rows show zero HTTP errors. That's the point: the unlocked path doesn't fail, it silently loses updates under READ COMMITTED, since two concurrent transactions can both read the same pre-decrement stock value before either commits. `select_for_update()` closes that window by making the second transaction's read wait for the first to commit, then re-read the already-updated value.
 
 - Full results, the analysis, and how to reproduce both rows on demand: [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md)
+- Same test over public HTTPS (the local docker stack behind a Cloudflare tunnel, not a hosted deployment; 40 users, 30 s, locking on): 100 units sold, stock dropped by exactly 100, 51 req/s aggregated, p50 640 ms, p95 1500 ms, zero 5xx. The 412 failures Locust reports were 344 correct 409 refusals after sell-out and 68 rate-limit 429s. Details and caveats: [docs/v2/DEPLOYED_LOAD_TEST.md](docs/v2/DEPLOYED_LOAD_TEST.md)
 - Locking tradeoff writeup: [docs/v2/adr/0003-locking-tradeoff.md](docs/v2/adr/0003-locking-tradeoff.md)
 - Cache effectiveness (Phase 2, proven via query counts, not just timing): report/dashboard endpoints go from 9/2/3 queries to 1 on a cache hit, verified directly with `CaptureQueriesContext` in `tests/test_caching.py`
 
@@ -178,6 +181,16 @@ docker compose exec api python manage.py createsuperuser
 docker compose exec api python manage.py seed_demo --products 500 --orders 2000
 ```
 
+Demo logins created by the seed (all use the password `demopass123`):
+
+| Role | Email |
+|---|---|
+| Admin | `demo-admin@demo.seed` |
+| Manager | `demo-manager-1@demo.seed` (also `demo-manager-2`) |
+| Employee | `demo-employee-1@demo.seed` (also `-2`, `-3`) |
+
+Note: compose binds Postgres to host port 5432. Stop any local Postgres first, or the stack won't start.
+
 **Running on the host instead of Docker:**
 
 ```bash
@@ -205,7 +218,9 @@ uv run pytest -v
 
 31 tests: role based access control, the atomic/idempotent transaction guarantee, cache hit/miss/isolation/rollback-safety, throttling, Celery task correctness (including the on-commit-gates-dispatch guarantee), and 2 real concurrency tests against a `live_server`.
 
-## Deployment
+## Deployment (optional)
+
+Inventra is not deployed anywhere. It runs locally with `docker compose up --build` (see [Quickstart](#quickstart)). If you want to host it yourself:
 
 - Containerized, deploys to [Railway](https://railway.app) from the Dockerfile directly (see `railway.json` for the api service).
 - The worker and beat processes are separate Railway services from the same repo with an overridden start command, plus a Redis plugin. Full setup: [docs/v2/DEPLOY.md](docs/v2/DEPLOY.md).
