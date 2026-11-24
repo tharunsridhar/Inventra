@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/tharunsridhar/Inventra/actions/workflows/ci.yml/badge.svg)
 
-**Locked: 78 sales against 100 units of stock, stock dropped by exactly 78. Unlocked, same test: 66 sales recorded but stock only dropped by 50, 16 silently lost, zero HTTP errors either way.**
+**Locked: 100 sales against 100 units of stock, stock dropped by exactly 100. Unlocked, same test: 143 to 198 sales recorded but stock only dropped by 3 to 5, so 138 to 195 sales silently lost, with zero HTTP errors on the unlocked path.**
 
 That's the headline from Phase 6's load test, not a claim. Concurrent requests hitting the same product without row-level locking don't fail loudly, they corrupt the ledger silently: the response looks like a success, the invoice gets issued, and the stock count just quietly stops matching the sales it recorded. Full numbers, the mechanism, and how to reproduce it: [Performance](#performance) below, full writeup in [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md).
 
@@ -22,14 +22,23 @@ Inventory management backend for a single-warehouse, single-currency retailer, b
 
 ## Performance
 
-Measured on a single local dev machine (not production hardware, see [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md) for the exact specs and every caveat), 40 concurrent users hitting `/sales-orders/{id}/complete` against one product with 100 units of stock:
+Measured on a single local dev machine (not production hardware, see [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md) for the exact specs and every caveat), 40 concurrent users (spawn rate 40, 20 s per run, Django dev server on the host, Postgres in Docker) hitting `/sales-orders/{id}/complete` against one product with 100 units of stock. Two runs per mode, run on 2026-11-23:
 
-| Locking | Sold | Stock actually dropped by | Discrepancy | HTTP errors |
-|---|---|---|---|---|
-| OFF | 66 | 50 | **16 lost updates** | 0 |
-| ON | 78 | 78 | **0** | 0 |
+| Locking | Run | Sold | Stock actually dropped by | Discrepancy | Req/s | p50 | p95 | HTTP errors |
+|---|---|---|---|---|---|---|---|---|
+| OFF | 1 | 198 | 3 | **195 lost updates** | 23.4 | 420 ms | 6500 ms | 0 |
+| OFF | 2 | 143 | 5 | **138 lost updates** | 19.2 | 1000 ms | 6300 ms | 0 |
+| ON | 1 | 86 | 86 | **0** | 19.6 | 1500 ms | 4900 ms | 0 |
+| ON | 2 | 100 | 100 | **0** | 30.5 | 970 ms | 4400 ms | 139 (all 409, after sell-out) |
 
-Both rows show zero HTTP errors. That's the point: the unlocked path doesn't fail, it silently loses updates under READ COMMITTED, since two concurrent transactions can both read the same pre-decrement stock value before either commits. `select_for_update()` closes that window by making the second transaction's read wait for the first to commit, then re-read the already-updated value.
+- Req/s, p50 and p95 are aggregated across all requests in the scenario.
+- The 409s in locked run 2 are correct refusals once stock hit 0. They are not failures.
+- The unlocked path sells more units than exist (143 and 198 against 100) and almost none of those sales reach the stock count.
+- Exact loss numbers vary a lot from run to run. Only the locked result (0 lost) is stable.
+- An earlier run on slower hardware (2026-09-08) showed 66 sold, 50 dropped, 16 lost unlocked and 78 sold, 78 dropped locked. Same mechanism, smaller loss. See [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md).
+- Throughput numbers come from a single-process dev server on a laptop. Read them as relative, not as capacity.
+
+The unlocked rows show zero HTTP errors. That's the point: the unlocked path doesn't fail, it silently loses updates under READ COMMITTED, since two concurrent transactions can both read the same pre-decrement stock value before either commits. `select_for_update()` closes that window by making the second transaction's read wait for the first to commit, then re-read the already-updated value.
 
 - Full results, the analysis, and how to reproduce both rows on demand: [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md)
 - Same test over public HTTPS (the local docker stack behind a Cloudflare tunnel, not a hosted deployment; 40 users, 30 s, locking on): 100 units sold, stock dropped by exactly 100, 51 req/s aggregated, p50 640 ms, p95 1500 ms, zero 5xx. The 412 failures Locust reports were 344 correct 409 refusals after sell-out and 68 rate-limit 429s. Details and caveats: [docs/v2/DEPLOYED_LOAD_TEST.md](docs/v2/DEPLOYED_LOAD_TEST.md)
