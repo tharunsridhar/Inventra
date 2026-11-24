@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "corsheaders",
+    "drf_spectacular",
     # domain apps
     "apps.accounts",
     "apps.catalog",
@@ -167,6 +168,7 @@ INVENTORY_LOCKING_ENABLED = os.environ.get("INVENTORY_LOCKING_ENABLED", "true").
 import apps.core.checks  # noqa: E402,F401
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
@@ -199,6 +201,16 @@ REST_FRAMEWORK = {
         "reports": "30/min",
         "anon": "20/min",
     },
+}
+
+# OpenAPI schema (served at /api/schema/, Swagger UI at /api/docs/). The React
+# frontend generates its TypeScript types from this schema.
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Inventra API",
+    "DESCRIPTION": "Inventory management API: JWT auth, role-based access, orders, returns and an append-only stock ledger.",
+    "VERSION": "2.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 # ROTATE_REFRESH_TOKENS + BLACKLIST_AFTER_ROTATION + the token_blacklist app

@@ -6,6 +6,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.views import TaskStatusView
 from config.celery import app as celery_app
@@ -46,7 +47,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("health", health_check, name="health"),
     path("app", TemplateView.as_view(template_name="app.html"), name="app"),
-    path("tasks/<uuid:task_id>/", TaskStatusView.as_view(), name="task-status"),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("tasks/<uuid:task_id>/",TaskStatusView.as_view(), name="task-status"),
     path("", include("apps.accounts.urls")),
     path("", include("apps.catalog.urls")),
     path("", include("apps.inventory.urls")),
