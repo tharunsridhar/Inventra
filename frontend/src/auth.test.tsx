@@ -92,4 +92,11 @@ describe("token refresh", () => {
     expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
     await waitFor(() => expect(tokens.refresh).toBeNull());
   });
+  it("keeps the stored token when the refresh is throttled, so a reload can retry", async () => {
+    server.use(http.post(`${API}/auth/refresh`, () => HttpResponse.json({ detail: "Request was throttled." }, { status: 429 })));
+    renderApp({ route: "/dashboard", signedInAs: "manager" });
+
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(tokens.refresh).toBe("refresh-manager");
+  });
 });

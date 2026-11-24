@@ -33,24 +33,30 @@ export function setSessionExpiredHandler(fn: () => void) {
 
 // Several requests can 401 at once when the access token expires. They all wait on one
 // refresh call, so the rotating refresh token is only spent once.
-let refreshing: Promise<boolean> | null = null;
+//   ok          new tokens stored
+//   rejected    the server said the refresh token is invalid, expired or blacklisted
+//   unavailable network failure, throttling (429) or a 5xx: the token may still be fine,
+//               so callers must not discard it
+export type RefreshResult = "ok" | "rejected" | "unavailable";
+let refreshing: Promise<RefreshResult> | null = null;
 
-export function refreshSession(): Promise<boolean> {
-  refreshing ??= (async () => {
+export function refreshSession(): Promise<RefreshResult> {
+  refreshing ??= (async (): Promise<RefreshResult> => {
     const refresh = tokens.refresh;
-    if (!refresh) return false;
+    if (!refresh) return "rejected";
     try {
       const res = await fetch(BASE + "/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh }),
       });
-      if (!res.ok) return false;
+      if (res.status === 401 || res.status === 400 || res.status === 403) return "rejected";
+      if (!res.ok) return "unavailable";
       const data = (await res.json()) as { access: string; refresh?: string };
       tokens.set(data.access, data.refresh);
-      return true;
+      return "ok";
     } catch {
-      return false;
+      return "unavailable";
     }
   })().finally(() => {
     refreshing = null;
@@ -85,10 +91,14 @@ export async function request<T>(path: string, opts: Options = {}, retried = fal
   }
 
   if (res.status === 401 && auth && !retried) {
-    if (await refreshSession()) return request<T>(path, opts, true);
-    tokens.clear();
-    onSessionExpired();
-    throw new ApiError(401, "Your session has expired. Please sign in again.");
+    const result = await refreshSession();
+    if (result === "ok") return request<T>(path, opts, true);
+    if (result === "rejected") {
+      tokens.clear();
+      onSessionExpired();
+      throw new ApiError(401, "Your session has expired. Please sign in again.");
+    }
+    throw new ApiError(503, "Could not refresh your session right now. Try again in a moment.");
   }
 
   if (res.status === 204) return undefined as T;

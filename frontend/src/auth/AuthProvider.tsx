@@ -38,9 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!tokens.refresh || !(await refreshSession())) {
-        // A stored refresh token the server rejects (expired or blacklisted) is dead: drop it.
-        tokens.clear();
+      const result = tokens.refresh ? await refreshSession() : "rejected";
+      if (result !== "ok") {
+        // Only a token the server rejected (expired or blacklisted) is dead. If the refresh
+        // was throttled or the network blipped, keep it so the next reload can retry.
+        if (result === "rejected") tokens.clear();
         if (!cancelled) setStatus("anonymous");
         return;
       }
