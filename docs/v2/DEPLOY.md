@@ -1,5 +1,7 @@
 # Deploying the worker and beat processes (Phase 7.1)
 
+**Optional.** Inventra has no hosted instance. These are instructions for anyone who wants to run it on Railway.
+
 `railway.json` configures exactly one Railway service - it's a per-service
 file, not a multi-process manifest, so it stays as the **api** service's
 config unchanged (gunicorn, `/health` healthcheck). Worker and beat aren't

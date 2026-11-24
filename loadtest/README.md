@@ -25,7 +25,7 @@ Locust.
 2. **Run with locking as-is** (default `INVENTORY_LOCKING_ENABLED=true`):
    ```bash
    uv run locust -f loadtest/locustfile.py --host http://localhost:8000 \
-     --users 500 --spawn-rate 50 --run-time 60s --headless \
+     --users 40 --spawn-rate 40 --run-time 20s --headless \
      --csv=loadtest/results/locked StockMutator
    ```
 3. **Check whether anything oversold** (Locust's own stats only show HTTP

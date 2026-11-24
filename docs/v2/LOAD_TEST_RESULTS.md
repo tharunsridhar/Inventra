@@ -196,15 +196,5 @@ concurrency:**
 
 ## GIF (6.6)
 
-A live run was driven through Locust's web UI (`--web-host 127.0.0.1
---web-port 8089`) and screenshotted mid-run: the Total Requests/sec chart
-ramping from 0 to ~10 RPS over the run, and the final statistics table (537
-requests, 23 correctly-rejected 409s once the contended product's stock
-was exhausted, 0 unexpected failures). An animated GIF was generated via
-browser-automation tooling in this session, but its exported file's
-on-disk location couldn't be resolved in this sandboxed environment to
-commit alongside these results. `loadtest/README.md`'s StockMutator
-procedure reproduces the same run on demand; running it through Locust's
-web UI on a normal machine (rather than headless, as used for the
-numbers above) captures the same thing without this environment's
-constraint.
+Demo recording: placeholder, to be added as `docs/demo.gif`. To reproduce the
+run yourself, follow `loadtest/README.md`.
