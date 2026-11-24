@@ -58,6 +58,7 @@ await ctx.addInitScript(() => {
       document.documentElement.appendChild(el);
     }
     el.textContent = text;
+    el.style.display = text ? "block" : "none";
   };
 });
 const page = await ctx.newPage();
@@ -67,6 +68,8 @@ const caption = async (text, holdMs = 2400) => {
   await page.waitForTimeout(holdMs);
   frameNo += 1;
   await page.screenshot({ path: path.join(here, "frames", String(frameNo).padStart(2, "0") + ".png") });
+  // Clear after the hold so a caption never sits over the next page change.
+  await page.evaluate(() => window.__cap("")).catch(() => {});
 };
 const nav = page.getByRole("navigation", { name: "Main" });
 const goTo = async (name) => {

@@ -6,9 +6,11 @@
 
 That's the headline from Phase 6's load test, not a claim. Concurrent requests hitting the same product without row-level locking don't fail loudly, they corrupt the ledger silently: the response looks like a success, the invoice gets issued, and the stock count just quietly stops matching the sales it recorded. Full numbers, the mechanism, and how to reproduce it: [Performance](#performance) below, full writeup in [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md).
 
+PASTE_GITHUB_VIDEO_LINK_HERE
+
 ![Inventra demo](docs/demo/inventra-demo.gif)
 
-*Demo: login, a sale that deducts stock, a retried completion answered with a 409, the append-only ledger, and the recorded locked vs unlocked load-test results. The [full video](docs/demo/inventra-demo.webm) is in the repo and `docs/demo/record.mjs` regenerates it against a local `docker compose up`.*
+*Demo (about 2 minutes): login, a sale that deducts stock, a retried completion answered with a 409, the append-only ledger, and the recorded locked vs unlocked load-test results. The GIF above is a slideshow fallback. `docs/demo/record.mjs` regenerates the video against a local `docker compose up`.*
 
 Inventory management backend for a single-warehouse, single-currency retailer, built on Django 5 + Django REST Framework: products, suppliers, purchase orders, sales orders, returns, and a stock movement ledger that's never edited or deleted, behind role based JWT auth. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a React + TypeScript frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend.
 
