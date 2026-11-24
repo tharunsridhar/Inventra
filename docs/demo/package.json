@@ -5,6 +5,7 @@
   "description": "Records the Inventra demo with Playwright (uses the installed Chrome)",
   "scripts": {
     "record": "node record.mjs",
+    "screenshots": "node screenshots.mjs",
     "gif": "python make_gif.py"
   },
   "dependencies": {

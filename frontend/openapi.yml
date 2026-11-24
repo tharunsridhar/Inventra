@@ -1,0 +1,3122 @@
+openapi: 3.0.3
+info:
+  title: Inventra API
+  version: 2.0.0
+  description: 'Inventory management API: JWT auth, role-based access, orders, returns
+    and an append-only stock ledger.'
+paths:
+  /auth/login:
+    post:
+      operationId: auth_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /auth/logout:
+    post:
+      operationId: auth_logout_create
+      description: |-
+        Takes a token and blacklists it. Must be used with the
+        `rest_framework_simplejwt.token_blacklist` app installed.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklistRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklistRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklistRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /auth/refresh:
+    post:
+      operationId: auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /auth/register:
+    post:
+      operationId: auth_register_create
+      description: POST /auth/register - the only unauthenticated write in the app.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+  /categories/:
+    get:
+      operationId: categories_list
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCategoryList'
+          description: ''
+    post:
+      operationId: categories_create
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+  /categories/{id}/:
+    get:
+      operationId: categories_retrieve
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this category.
+        required: true
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    put:
+      operationId: categories_update
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this category.
+        required: true
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    patch:
+      operationId: categories_partial_update
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this category.
+        required: true
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    delete:
+      operationId: categories_destroy
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this category.
+        required: true
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /damage:
+    post:
+      operationId: damage_create
+      tags:
+      - damage
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /dashboard:
+    get:
+      operationId: dashboard_retrieve
+      tags:
+      - dashboard
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /inventory-transactions/:
+    get:
+      operationId: inventory_transactions_list
+      description: |-
+        Read-only on purpose - no create/update/delete routes exist here at
+        all, so the ledger can't be edited or erased once written. That's
+        enforced by which router this ViewSet is registered under (list/retrieve
+        only), the same way Inventra's transactions.py only ever defines a GET.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: transaction_type
+        schema:
+          type: string
+      tags:
+      - inventory-transactions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInventoryTransactionReadList'
+          description: ''
+  /inventory-transactions/{id}/:
+    get:
+      operationId: inventory_transactions_retrieve
+      description: |-
+        Read-only on purpose - no create/update/delete routes exist here at
+        all, so the ledger can't be edited or erased once written. That's
+        enforced by which router this ViewSet is registered under (list/retrieve
+        only), the same way Inventra's transactions.py only ever defines a GET.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this inventory transaction.
+        required: true
+      tags:
+      - inventory-transactions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryTransactionRead'
+          description: ''
+  /notifications/:
+    get:
+      operationId: notifications_list
+      description: Per-user, filterable by unread - each user only ever sees their
+        own.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /notifications/{id}/:
+    get:
+      operationId: notifications_retrieve
+      description: Per-user, filterable by unread - each user only ever sees their
+        own.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /notifications/{id}/read/:
+    patch:
+      operationId: notifications_read_partial_update
+      description: Per-user, filterable by unread - each user only ever sees their
+        own.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /products/:
+    get:
+      operationId: products_list
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: stock_status
+        schema:
+          type: string
+      - in: query
+        name: supplier_id
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+    post:
+      operationId: products_create
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /products/{id}/:
+    get:
+      operationId: products_retrieve
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this product.
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    put:
+      operationId: products_update
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this product.
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    patch:
+      operationId: products_partial_update
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this product.
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    delete:
+      operationId: products_destroy
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this product.
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /purchase-orders/:
+    get:
+      operationId: purchase_orders_list
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - ordered
+          - received
+        description: |-
+          * `ordered` - Ordered
+          * `received` - Received
+      tags:
+      - purchase-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPurchaseOrderReadList'
+          description: ''
+    post:
+      operationId: purchase_orders_create
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      tags:
+      - purchase-orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderWrite'
+          description: ''
+  /purchase-orders/{id}/:
+    get:
+      operationId: purchase_orders_retrieve
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this purchase order.
+        required: true
+      tags:
+      - purchase-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderRead'
+          description: ''
+    put:
+      operationId: purchase_orders_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this purchase order.
+        required: true
+      tags:
+      - purchase-orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderWrite'
+          description: ''
+    patch:
+      operationId: purchase_orders_partial_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this purchase order.
+        required: true
+      tags:
+      - purchase-orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPurchaseOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPurchaseOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPurchaseOrderWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderWrite'
+          description: ''
+    delete:
+      operationId: purchase_orders_destroy
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this purchase order.
+        required: true
+      tags:
+      - purchase-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /purchase-orders/{id}/receive/:
+    post:
+      operationId: purchase_orders_receive_create
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this purchase order.
+        required: true
+      tags:
+      - purchase-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderRead'
+          description: ''
+  /reports/inventory:
+    get:
+      operationId: reports_inventory_retrieve
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /reports/products:
+    get:
+      operationId: reports_products_retrieve
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /reports/purchases:
+    get:
+      operationId: reports_purchases_retrieve
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /reports/sales:
+    get:
+      operationId: reports_sales_retrieve
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /returns/:
+    get:
+      operationId: returns_list
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - returns
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReturnReadList'
+          description: ''
+    post:
+      operationId: returns_create
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      tags:
+      - returns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReturnCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReturnCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnCreate'
+          description: ''
+  /returns/{id}/:
+    get:
+      operationId: returns_retrieve
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this return.
+        required: true
+      tags:
+      - returns
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRead'
+          description: ''
+    put:
+      operationId: returns_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this return.
+        required: true
+      tags:
+      - returns
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRead'
+          description: ''
+    patch:
+      operationId: returns_partial_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this return.
+        required: true
+      tags:
+      - returns
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRead'
+          description: ''
+    delete:
+      operationId: returns_destroy
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this return.
+        required: true
+      tags:
+      - returns
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /returns/{id}/approve/:
+    patch:
+      operationId: returns_approve_partial_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this return.
+        required: true
+      tags:
+      - returns
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRead'
+          description: ''
+  /sales-orders/:
+    get:
+      operationId: sales_orders_list
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - completed
+          - created
+        description: |-
+          * `created` - Created
+          * `completed` - Completed
+      tags:
+      - sales-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSalesOrderReadList'
+          description: ''
+    post:
+      operationId: sales_orders_create
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      tags:
+      - sales-orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SalesOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SalesOrderWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesOrderWrite'
+          description: ''
+  /sales-orders/{id}/:
+    get:
+      operationId: sales_orders_retrieve
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this sales order.
+        required: true
+      tags:
+      - sales-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesOrderRead'
+          description: ''
+    put:
+      operationId: sales_orders_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this sales order.
+        required: true
+      tags:
+      - sales-orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SalesOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SalesOrderWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesOrderWrite'
+          description: ''
+    patch:
+      operationId: sales_orders_partial_update
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this sales order.
+        required: true
+      tags:
+      - sales-orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSalesOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSalesOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSalesOrderWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesOrderWrite'
+          description: ''
+    delete:
+      operationId: sales_orders_destroy
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this sales order.
+        required: true
+      tags:
+      - sales-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /sales-orders/{id}/complete/:
+    post:
+      operationId: sales_orders_complete_create
+      description: Mix in alongside a DRF ViewSet (which provides self.action).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this sales order.
+        required: true
+      tags:
+      - sales-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesOrderRead'
+          description: ''
+  /sales-orders/{id}/invoice/:
+    get:
+      operationId: sales_orders_invoice_retrieve
+      description: |-
+        Generates the invoice PDF asynchronously - was synchronous, now
+        returns 202 + a task id immediately and GET /tasks/{id}/ reports
+        progress and (once ready) a result_url for the PDF.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this sales order.
+        required: true
+      tags:
+      - sales-orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesOrderRead'
+          description: ''
+  /suppliers/:
+    get:
+      operationId: suppliers_list
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - suppliers
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSupplierList'
+          description: ''
+    post:
+      operationId: suppliers_create
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      tags:
+      - suppliers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+  /suppliers/{id}/:
+    get:
+      operationId: suppliers_retrieve
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this supplier.
+        required: true
+      tags:
+      - suppliers
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    put:
+      operationId: suppliers_update
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this supplier.
+        required: true
+      tags:
+      - suppliers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    patch:
+      operationId: suppliers_partial_update
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this supplier.
+        required: true
+      tags:
+      - suppliers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplierRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplierRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplierRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    delete:
+      operationId: suppliers_destroy
+      description: |-
+        Every authenticated role can read; only Manager/Admin can write -
+        the same split Inventra's `manager_or_admin` dependency enforces per
+        write route, expressed once here via get_permissions() instead of
+        once per endpoint.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this supplier.
+        required: true
+      tags:
+      - suppliers
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /tasks/{task_id}/:
+    get:
+      operationId: tasks_retrieve
+      description: |-
+        GET /tasks/{id}/ - generic status endpoint for any Celery task
+        dispatched from a request (currently just invoice generation). Reads
+        straight from the Celery result backend rather than a DB model - there's
+        nothing to keep in sync, the result backend already durably has the
+        answer for as long as CELERY_RESULT_BACKEND retains it.
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - tasks
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /users/:
+    get:
+      operationId: users_list
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserReadList'
+          description: ''
+    post:
+      operationId: users_create
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreate'
+          description: ''
+  /users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+          description: ''
+    put:
+      operationId: users_update
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserUpdate'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserUpdate'
+          description: ''
+    delete:
+      operationId: users_destroy
+      description: Soft delete - matches Inventra's disable_user, just flips is_active
+        off.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /users/{id}/enable/:
+    patch:
+      operationId: users_enable_partial_update
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+          description: ''
+  /users/{id}/reset-password/:
+    patch:
+      operationId: users_reset_password_partial_update
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+          description: ''
+  /users/{id}/role/:
+    patch:
+      operationId: users_role_partial_update
+      description: |-
+        Admin-only: list/retrieve/create/update, plus the same custom actions
+        Inventra exposes (assign-role, reset-password, enable/disable) as extra
+        routes via @action - DRF's answer to FastAPI's one-off
+        @router.patch("/{id}/role") style endpoints.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+          description: ''
+  /users/me:
+    get:
+      operationId: users_me_retrieve
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+          description: ''
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+    CategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+        is_active:
+          type: boolean
+      required:
+      - name
+    InventoryTransactionRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        transaction_type:
+          allOf:
+          - $ref: '#/components/schemas/TransactionTypeEnum'
+          readOnly: true
+        reference_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        reason:
+          type: string
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - id
+      - product
+      - quantity
+      - reason
+      - reference_id
+      - transaction_type
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        type:
+          allOf:
+          - $ref: '#/components/schemas/TypeEnum'
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+        reference_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        is_read:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - is_read
+      - message
+      - reference_id
+      - type
+    PaginatedCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+    PaginatedInventoryTransactionReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryTransactionRead'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    PaginatedProductList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+    PaginatedPurchaseOrderReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderRead'
+    PaginatedReturnReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnRead'
+    PaginatedSalesOrderReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesOrderRead'
+    PaginatedSupplierList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Supplier'
+    PaginatedUserReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserRead'
+    PatchedCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+        is_active:
+          type: boolean
+    PatchedProductRequest:
+      type: object
+      properties:
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        cost_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        current_stock:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        low_stock_threshold:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        category:
+          type: string
+          format: uuid
+        supplier:
+          type: string
+          format: uuid
+        is_active:
+          type: boolean
+    PatchedPurchaseOrderWriteRequest:
+      type: object
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderItemInputRequest'
+    PatchedSalesOrderWriteRequest:
+      type: object
+      properties:
+        customer_name:
+          type: string
+          nullable: true
+          minLength: 1
+        customer_phone:
+          type: string
+          nullable: true
+          minLength: 1
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesOrderItemInputRequest'
+    PatchedSupplierRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        phone:
+          type: string
+          nullable: true
+          maxLength: 50
+        address:
+          type: string
+          nullable: true
+          maxLength: 1000
+        is_active:
+          type: boolean
+    PatchedUserUpdateRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        sku:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        cost_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        current_stock:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        low_stock_threshold:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        category:
+          type: string
+          format: uuid
+        supplier:
+          type: string
+          format: uuid
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category
+      - cost_price
+      - created_at
+      - id
+      - name
+      - selling_price
+      - sku
+      - supplier
+    ProductRequest:
+      type: object
+      properties:
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        cost_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        current_stock:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        low_stock_threshold:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        category:
+          type: string
+          format: uuid
+        supplier:
+          type: string
+          format: uuid
+        is_active:
+          type: boolean
+      required:
+      - category
+      - cost_price
+      - name
+      - selling_price
+      - sku
+      - supplier
+    PurchaseOrderItemInput:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - product_id
+      - quantity
+      - unit_cost
+    PurchaseOrderItemInputRequest:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - product_id
+      - quantity
+      - unit_cost
+    PurchaseOrderItemRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - id
+      - product
+      - quantity
+      - unit_cost
+    PurchaseOrderItemReadRequest:
+      type: object
+      properties:
+        product:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - product
+      - quantity
+      - unit_cost
+    PurchaseOrderRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        supplier:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PurchaseOrderReadStatusEnum'
+          readOnly: true
+        received_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderItemRead'
+          readOnly: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - id
+      - items
+      - received_at
+      - status
+      - supplier
+    PurchaseOrderReadStatusEnum:
+      enum:
+      - ordered
+      - received
+      type: string
+      description: |-
+        * `ordered` - Ordered
+        * `received` - Received
+    PurchaseOrderWrite:
+      type: object
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderItemInput'
+      required:
+      - items
+      - supplier_id
+    PurchaseOrderWriteRequest:
+      type: object
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderItemInputRequest'
+      required:
+      - items
+      - supplier_id
+    Register:
+      type: object
+      description: |-
+        Anyone can self-register, but they always come in as Employee - only
+        an Admin can promote someone via UserViewSet.assign_role. Mirrors
+        Inventra's POST /auth/register exactly.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        full_name:
+          type: string
+          maxLength: 255
+      required:
+      - email
+      - full_name
+      - id
+    RegisterRequest:
+      type: object
+      description: |-
+        Anyone can self-register, but they always come in as Employee - only
+        an Admin can promote someone via UserViewSet.assign_role. Mirrors
+        Inventra's POST /auth/register exactly.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+      required:
+      - email
+      - full_name
+      - password
+    ReturnCreate:
+      type: object
+      properties:
+        sales_order:
+          type: string
+          format: uuid
+        product:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        reason:
+          type: string
+          maxLength: 1000
+      required:
+      - product
+      - quantity
+      - reason
+      - sales_order
+    ReturnCreateRequest:
+      type: object
+      properties:
+        sales_order:
+          type: string
+          format: uuid
+        product:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+      - product
+      - quantity
+      - reason
+      - sales_order
+    ReturnRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        sales_order:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ReturnReadStatusEnum'
+          readOnly: true
+        approved_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - approved_by
+      - created_at
+      - created_by
+      - id
+      - product
+      - quantity
+      - reason
+      - sales_order
+      - status
+    ReturnReadStatusEnum:
+      enum:
+      - pending
+      - approved
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `approved` - Approved
+    RoleEnum:
+      enum:
+      - admin
+      - manager
+      - employee
+      type: string
+      description: |-
+        * `admin` - Admin
+        * `manager` - Manager
+        * `employee` - Employee
+    SalesOrderItemInput:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - product_id
+      - quantity
+    SalesOrderItemInputRequest:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - product_id
+      - quantity
+    SalesOrderItemRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - id
+      - product
+      - quantity
+      - unit_price
+    SalesOrderItemReadRequest:
+      type: object
+      properties:
+        product:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - product
+      - quantity
+      - unit_price
+    SalesOrderRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SalesOrderReadStatusEnum'
+          readOnly: true
+        customer_name:
+          type: string
+          readOnly: true
+          nullable: true
+        customer_phone:
+          type: string
+          readOnly: true
+          nullable: true
+        invoice_number:
+          type: string
+          readOnly: true
+          nullable: true
+        invoiced_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesOrderItemRead'
+          readOnly: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - customer_name
+      - customer_phone
+      - id
+      - invoice_number
+      - invoiced_at
+      - items
+      - status
+    SalesOrderReadStatusEnum:
+      enum:
+      - created
+      - completed
+      type: string
+      description: |-
+        * `created` - Created
+        * `completed` - Completed
+    SalesOrderWrite:
+      type: object
+      properties:
+        customer_name:
+          type: string
+          nullable: true
+        customer_phone:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesOrderItemInput'
+      required:
+      - items
+    SalesOrderWriteRequest:
+      type: object
+      properties:
+        customer_name:
+          type: string
+          nullable: true
+          minLength: 1
+        customer_phone:
+          type: string
+          nullable: true
+          minLength: 1
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesOrderItemInputRequest'
+      required:
+      - items
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          nullable: true
+          maxLength: 50
+        address:
+          type: string
+          nullable: true
+          maxLength: 1000
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - id
+      - name
+    SupplierRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        phone:
+          type: string
+          nullable: true
+          maxLength: 50
+        address:
+          type: string
+          nullable: true
+          maxLength: 1000
+        is_active:
+          type: boolean
+      required:
+      - email
+      - name
+    TokenBlacklistRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - refresh
+    TokenObtainPair:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    TokenObtainPairRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TransactionTypeEnum:
+      enum:
+      - purchase
+      - sale
+      - return
+      - damage
+      type: string
+      description: |-
+        * `purchase` - Purchase
+        * `sale` - Sale
+        * `return` - Return
+        * `damage` - Damage
+    TypeEnum:
+      enum:
+      - low_stock
+      - out_of_stock
+      - purchase_completed
+      - sale_completed
+      - reconciliation_mismatch
+      type: string
+      description: |-
+        * `low_stock` - Low stock
+        * `out_of_stock` - Out of stock
+        * `purchase_completed` - Purchase completed
+        * `sale_completed` - Sale completed
+        * `reconciliation_mismatch` - Ledger reconciliation mismatch
+    UserCreate:
+      type: object
+      description: Admin-only user creation, unlike RegisterSerializer - role is settable
+        here.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        full_name:
+          type: string
+          maxLength: 255
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+      required:
+      - email
+      - full_name
+      - id
+    UserCreateRequest:
+      type: object
+      description: Admin-only user creation, unlike RegisterSerializer - role is settable
+        here.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+      required:
+      - email
+      - full_name
+      - password
+    UserRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - full_name
+      - id
+      - is_active
+      - role
+    UserUpdate:
+      type: object
+      properties:
+        full_name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 254
+      required:
+      - email
+      - full_name
+    UserUpdateRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+      required:
+      - email
+      - full_name
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

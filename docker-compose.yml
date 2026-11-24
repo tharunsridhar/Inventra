@@ -56,6 +56,15 @@ services:
       redis:
         condition: service_healthy
 
+  # React frontend: nginx serves the Vite build on :3000 and proxies /api to the api service.
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
   worker:
     build: .
     restart: unless-stopped

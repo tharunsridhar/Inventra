@@ -8,11 +8,9 @@ That's the headline from Phase 6's load test, not a claim. Concurrent requests h
 
 ![Inventra demo](docs/demo/inventra-demo.gif)
 
-*Demo: login, a sale that deducts stock, the append-only ledger, and the recorded locked vs unlocked load-test results. The [full video](docs/demo/inventra-demo.webm) is in the repo and `docs/demo/record.mjs` regenerates it against a local `docker compose up`.*
+*Demo: login, a sale that deducts stock, a retried completion answered with a 409, the append-only ledger, and the recorded locked vs unlocked load-test results. The [full video](docs/demo/inventra-demo.webm) is in the repo and `docs/demo/record.mjs` regenerates it against a local `docker compose up`.*
 
-Demo recording coming soon. Until then, `loadtest/README.md` reproduces the same run on demand.
-
-Inventory management backend for a single-warehouse, single-currency retailer, built on Django 5 + Django REST Framework: products, suppliers, purchase orders, sales orders, returns, and a stock movement ledger that's never edited or deleted, behind role based JWT auth. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a bundled login and dashboard frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend.
+Inventory management backend for a single-warehouse, single-currency retailer, built on Django 5 + Django REST Framework: products, suppliers, purchase orders, sales orders, returns, and a stock movement ledger that's never edited or deleted, behind role based JWT auth. This branch (`v2`) is the full build: caching, background jobs, rate limiting, structured logging, the load-test evidence above, plus a React + TypeScript frontend. See the [`v1`](https://github.com/tharunsridhar/Inventra/tree/v1) branch for the same backend, API only, no frontend.
 
 - Products, suppliers, purchase orders, sales orders, returns, damage write offs
 - Append only stock ledger, enforced twice (no write route, and the Admin can't edit or delete it either)
@@ -20,7 +18,7 @@ Inventory management backend for a single-warehouse, single-currency retailer, b
 - Redis-cached reports, Celery background jobs (async invoices, low-stock alerts, nightly ledger reconciliation)
 - Structured JSON logging with one request id traced across the web process and any worker task it dispatches
 
-📘 **API docs:** DRF's browsable API at any endpoint (e.g. `/products`), `/admin` for the Django Admin
+📘 **API docs:** Swagger UI at `/api/docs/` (OpenAPI schema at `/api/schema/`), DRF's browsable API at any endpoint (e.g. `/products`), `/admin` for the Django Admin
 
 ## Performance
 
@@ -95,45 +93,74 @@ flowchart LR
 - pytest + pytest-django
 - Docker, GitHub Actions
 
-Also includes a bundled frontend: plain HTML/JS served via Django templates and `{% static %}`, no separate build step or JS framework. See the [Frontend](#frontend) section below.
+Also includes a React + TypeScript frontend (Vite, TanStack Query, Vitest). See the [Frontend](#frontend) section below.
 
 ## Frontend
 
-A single-page app at `/app`, written in vanilla JS (about 1,000 lines in [static/frontend/app.js](static/frontend/app.js)) with one Django template, [templates/app.html](templates/app.html). No framework, no bundler, no npm. Django serves the HTML and the static files, and the JS talks to the same REST API documented below.
+A React + TypeScript single page app in [frontend/](frontend/), built with Vite. It uses the same REST API as everything else here, with no backend changes beyond the OpenAPI schema it is typed from.
 
-**Views**
-- Dashboard: stat cards (products, categories, suppliers, users, purchase and sales order counts, low stock, out of stock)
-- Products: search, stock status filter (in stock, low, out), pagination, create, edit, delete
-- Categories & Suppliers: list, create, delete
-- Purchase Orders: list, create with line items, receive (confirm dialog, then stock goes up)
-- Sales Orders: list, create with line items, complete (stock goes down), invoice
-- Returns: list, create, approve
-- Damage Write-off: log a write-off with a reason, see recent damage entries
-- Transactions: read-only stock ledger, filterable by type, paginated
-- Reports: product, purchase, sales and inventory reports with a date range (shown as raw JSON for now)
-- Users: create, change role, disable and enable, reset password
-- Notifications: drawer with an unread badge, mark as read
+![Dashboard](docs/screenshots/dashboard.png)
+
+| | |
+|---|---|
+| ![New sale dialog](docs/screenshots/new-sale.png) | ![409 conflict on a retried completion](docs/screenshots/conflict-409.png) |
+| ![Transactions ledger](docs/screenshots/transactions.png) | ![Phone width with the menu open](docs/screenshots/phone-menu.png) |
+
+**Run it**
+- Docker: `docker compose up --build`, then open http://localhost:3000. nginx serves the build and proxies `/api` to Django, so the browser sees one origin and CORS never comes into it
+- Dev server: `cd frontend && npm install && npm run dev`, then open http://localhost:5173. Vite proxies `/api` to http://localhost:8000 (set `VITE_API_TARGET` to point somewhere else)
+- Seed the demo users first, see [Quickstart](#quickstart)
+
+**Pages**
+- Dashboard: stat cards and a low stock list (Admin, Manager)
+- Products: search, stock, category and supplier filters, pagination, create, edit, delete. Filters live in the URL, so a filtered view is linkable
+- Categories & suppliers: list, create, delete
+- Purchase orders: create with line items, receive with a confirm step
+- Sales orders: create with line items, complete with a confirm step, invoice PDF
+- Returns: file against a completed sale, approve
+- Damage write-off: log a write-off with a reason, see recent ones
+- Transactions: the read-only stock ledger with a type filter and pagination
+- Reports: product, purchase, sales and inventory reports with a date range, shown as tables
+- Users: create, change role, disable and enable, reset password (Admin)
+- Notifications: drawer with an unread count and mark as read
+- Every list has loading, empty and error states, and errors have a retry button
 
 **Auth**
-- Email and password login against `/auth/login`, tokens kept in `localStorage`
-- Every request sends the access token as a Bearer header
-- On a 401 the client calls `/auth/refresh`, stores the rotated token pair, and retries the original request
-- If the refresh fails it logs out and returns to the login screen
+- Login against `/auth/login`. The access token stays in memory, the refresh token is kept in `localStorage` so a reload keeps you signed in
+- A 401 triggers one `/auth/refresh` call, however many requests failed at once, then the original requests are retried
+- If the refresh fails the user is sent back to the login form
 - Logout calls `/auth/logout` so the refresh token is blacklisted server side
 
-**Role based visibility**
-- The nav is filtered by the signed-in role: Returns, Damage Write-off and Reports are Admin and Manager only, Users is Admin only
-- Product edit and delete controls only render for Admin and Manager
-- Employees get a friendly message on the Dashboard instead of an error
-- This is UI polish only. The real enforcement is the DRF permission classes on the API, so hiding a button never grants or removes access.
+**Role based navigation**
+- Employee: Products, Categories & suppliers, Sales orders
+- Manager: everything except Users
+- Admin: everything
+- This mirrors the DRF permission classes (it also hides Purchase orders and Transactions from employees, which the API refuses them anyway). A staff-only URL typed by an employee shows a "not available" page. The real enforcement is the API, so hiding a link never grants or removes access
 
-**Async invoices**
-- Invoice generation is a Celery job. The UI requests the invoice, polls `/tasks/{id}` until it finishes, then links to the PDF.
+**409 conflicts**
+- Completing a sale, receiving a purchase order and approving a return are guarded server side, so a retried request gets a 409
+- The confirm dialog shows that as a distinct "Conflict (409): nothing was changed" notice with the server's own message (already completed, or insufficient stock), removes the confirm button so it can't be fired again, and refreshes the list behind it
+
+**Typed API client**
+- The API now serves an OpenAPI schema at `/api/schema/` and Swagger UI at `/api/docs/` (drf-spectacular, the only backend change)
+- [frontend/openapi.yml](frontend/openapi.yml) is a snapshot of that schema. `npm run gen:api` turns it into [frontend/src/api/schema.d.ts](frontend/src/api/schema.d.ts)
+- Refresh the snapshot after an API change: `uv run python manage.py spectacular --file frontend/openapi.yml`, then `npm run gen:api`
+- The dashboard, reports, damage and task status views are plain `APIView`s with no serializer, so the schema can't describe them. Their response types are written by hand in [frontend/src/api/types.ts](frontend/src/api/types.ts)
+
+**Tests and checks**
+- `npm test`: Vitest and React Testing Library with MSW standing in for the API. Covers login, token refresh and logout, role based navigation, creating a sale, and the 409 cases
+- `npm run lint` (ESLint with jsx-a11y), `npm run typecheck` and `npm run build` also run
+- All four run as the `frontend` job in [.github/workflows/ci.yml](.github/workflows/ci.yml)
+
+**Accessibility and small screens**
+- Every input has a label, errors are tied to their field, dialogs trap focus and return it on close, Escape closes them, and there is a skip link
+- Toasts and the notification count are announced through live regions
+- The sidebar collapses behind a Menu button on phones and wide tables scroll sideways inside their panel
 
 **Stack**
-- Vanilla JS single page app, fetch API, no dependencies
-- Served by Django (`TemplateView` at `/app`, static files via whitenoise)
-- Same origin as the API, so no CORS setup is needed for the bundled UI
+- React 19, TypeScript (strict), Vite, React Router, TanStack Query
+- Plain CSS, no component library
+- Orders, returns and the ledger carry product ids only, so names come from a cached product index. The product pickers search the API as you type, so they work at any catalog size
 
 ## Key engineering decisions
 
@@ -172,8 +199,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Starts postgres, redis, the api, a Celery worker, and Celery beat. Reaches **http://localhost:8000**:
-- `/app`: the bundled login and dashboard frontend (plain HTML/JS, served via Django templates and static files, no separate build step)
+Starts postgres, redis, the api, a Celery worker, Celery beat and the React frontend. The app is at **http://localhost:3000** (nginx serves the build and proxies `/api` to Django). The API is at **http://localhost:8000**:
+- `/api/docs/`: Swagger UI for the whole API (`/api/schema/` is the raw OpenAPI schema)
+- `/app`: the previous plain HTML/JS frontend, still served by Django for now
 - `/admin`: Django Admin (create a superuser first, see below)
 - any resource path, e.g. `/products`: DRF's browsable API (HTML form + JSON, no separate client needed)
 - `/health`: reports database, redis, and celery status (the last one pings the actual worker)
@@ -281,11 +309,12 @@ config/
   settings/     - base.py / development.py / production.py / test.py
   celery.py     - Celery app, imported from config/__init__.py
   urls.py       - route table, /health, /tasks/{id}
+frontend/       - React + TypeScript app (Vite), its Dockerfile and nginx.conf, Vitest suite, openapi.yml snapshot
 loadtest/       - locustfile.py + how to run it (see docs/v2/LOAD_TEST_RESULTS.md)
 docs/v2/        - CURRENT_STATE.md, LOAD_TEST_RESULTS.md, LOG_SAMPLE.md, DEPLOY.md, adr/
 tests/          - pytest-django suite (see "Running the tests" above)
 Dockerfile, docker-compose.yml, railway.json - see Quickstart / Deployment
-.github/workflows/ci.yml - postgres + redis services, migrations + pytest + ruff on every push/PR to main
+.github/workflows/ci.yml - postgres + redis services, migrations + pytest + ruff, plus a frontend job (lint, typecheck, Vitest, build), on every push/PR
 ```
 
 Five apps, not eleven. `inventory` groups PurchaseOrder/SalesOrder/Return/InventoryTransaction together deliberately, since they're all tightly coupled around the one stock ledger. `core` isn't a Django app (no models) - just where the v2 cross-cutting infrastructure (caching, throttling, request tracing, the locking-kill-switch guard) lives, since none of it belongs to one domain app.
