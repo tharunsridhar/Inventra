@@ -6,7 +6,11 @@
 
 That's the headline from Phase 6's load test, not a claim. Concurrent requests hitting the same product without row-level locking don't fail loudly, they corrupt the ledger silently: the response looks like a success, the invoice gets issued, and the stock count just quietly stops matching the sales it recorded. Full numbers, the mechanism, and how to reproduce it: [Performance](#performance) below, full writeup in [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md).
 
-PASTE_GITHUB_VIDEO_LINK_HERE
+
+
+https://github.com/user-attachments/assets/b662dbb1-729b-4d87-910e-d0a41ebe60e7
+
+
 
 ![Inventra demo](docs/demo/inventra-demo.gif)
 
