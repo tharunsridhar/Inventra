@@ -42,7 +42,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # control-server file directly into its home directory.
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && chown app:app /app \
-    && mkdir -p /app/staticfiles && chown app:app /app/staticfiles
+    && mkdir -p /app/staticfiles /app/media && chown app:app /app/staticfiles /app/media
 
 USER app
 

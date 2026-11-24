@@ -62,6 +62,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    volumes:
+      # Invoice PDFs written by the worker. Django only serves /media when DEBUG is on,
+      # so nginx serves them straight from the shared volume.
+      - media_data:/usr/share/nginx/media:ro
     depends_on:
       - api
 

@@ -17,7 +17,8 @@ export default defineConfig({
         changeOrigin: false,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
-      // Invoice PDFs are served by Django from /media.
+      // Invoice PDFs. Django serves /media only with DEBUG on (local runserver); the
+      // Docker stack serves them from nginx instead.
       "/media": { target: API_TARGET },
     },
   },
