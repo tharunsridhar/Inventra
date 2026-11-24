@@ -6,7 +6,9 @@
 
 That's the headline from Phase 6's load test, not a claim. Concurrent requests hitting the same product without row-level locking don't fail loudly, they corrupt the ledger silently: the response looks like a success, the invoice gets issued, and the stock count just quietly stops matching the sales it recorded. Full numbers, the mechanism, and how to reproduce it: [Performance](#performance) below, full writeup in [docs/v2/LOAD_TEST_RESULTS.md](docs/v2/LOAD_TEST_RESULTS.md).
 
-<!-- TODO: record docs/demo.gif (login, purchase order, sale, ledger, locked vs unlocked load test), then replace this comment with: ![Inventra demo](docs/demo.gif) -->
+![Inventra demo](docs/demo/inventra-demo.gif)
+
+*Demo: login, a sale that deducts stock, the append-only ledger, and the recorded locked vs unlocked load-test results. The [full video](docs/demo/inventra-demo.webm) is in the repo and `docs/demo/record.mjs` regenerates it against a local `docker compose up`.*
 
 Demo recording coming soon. Until then, `loadtest/README.md` reproduces the same run on demand.
 
